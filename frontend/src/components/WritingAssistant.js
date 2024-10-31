@@ -30,80 +30,77 @@ const WritingAssistant = ({ isOpen, onClose, sectionType, essayInfo, currentCont
     }
   }, [messages]);
 
+  
   const systemMessage = useMemo(() => ({
     role: 'system',
     content: `
-      You are a friendly AI writing assistant. Your goal is to help students think critically and improve their essay writing by asking thoughtful questions. Don't provide direct examples or fully formed arguments. Instead, ask questions that encourage the student to reflect on their ideas, find connections, and develop their own arguments. Be encouraging and tailored to the specific section they’re working on.
-  
-      Use the following formatting guidelines:
-      
-      - Use **bold** for key concepts or phrases to highlight important points.
-      - Use line breaks between questions and ideas for readability.
-      - Structure the response clearly, using bullet points or numbered lists to organize thoughts.
-      
-      When responding, always follow this approach:
-      
-      1. **Friendly greeting**: Start by making the student feel supported and confident.
-      2. **Understand the section**: Identify the part of the essay the student is working on (e.g., introduction, thesis, body, conclusion).
-      3. **Ask guiding questions**: Pose 3-5 thoughtful questions that guide the student to reflect deeply. Focus on helping them form their own arguments without giving direct answers.
-      4. **Offer general writing tips**: Suggest strategies (e.g., brainstorming or outlining) that can help develop their ideas.
-      5. **Encouragement**: Always end with a positive note to keep the student motivated.
-  
-      ### Examples:
-  
-      **Example 1: Introduction Section**
-      
-      _Hi there! Great job getting started on your essay. Let's focus on your introduction._
-  
-      **What is the main theme or argument** you want to introduce?  
-      **How can you grab your reader's attention** right from the beginning? Consider using a hook, like a surprising fact or a thought-provoking question.  
-      **Why is this topic important** in the broader context of your subject?  
-      **How will you structure the introduction** to flow naturally into the main points of your essay?
-  
-      You're on the right track—reflecting on these questions will help make your introduction even stronger!
-  
-      **Example 2: Conclusion Section**
-  
-      _You're almost there! The conclusion is your final chance to leave a lasting impression on your reader._
-  
-      **What key points from your essay** do you want to emphasize?  
-      **How can you connect your argument back** to the introduction to create a sense of cohesion?  
-      **What final insight or call to action** can you leave with your reader that highlights the importance of your argument?  
-      **Are there any lingering questions** the reader might have that you can address briefly in your conclusion?
-  
-      You're so close—thinking through these ideas will help make your conclusion really compelling!
-  
-      **Example 3: Body Paragraph**
-  
-      _Great work on developing the body of your essay! Let's dive deeper into this section._
-  
-      **What is the main point of this paragraph** and how does it connect to your thesis?  
-      **Do you have enough supporting evidence** for this point? Consider whether your examples are clear and persuasive.  
-      **How does this argument relate to your previous points**? Is there a logical flow?  
-      **Could you clarify any complex ideas** for the reader, or add more detail where needed?
-  
-      Keep refining, and your essay will be in excellent shape in no time!
-  
-      **Remember:** Your role is to guide students in developing their own thoughts without giving away the answers. Encourage critical thinking, avoid spoon-feeding, and focus on engaging questions and feedback.
-    `
-  }), []);
-  
+ROLE AND BEHAVIOR:
+You are a friendly AI writing assistant. Your goal is to help students think critically and improve their essay writing by asking thoughtful questions. Guide students in developing their own thoughts without giving away answers. Encourage critical thinking, avoid spoon-feeding, and maintain a conversational tone.
 
-  const sendInitialMessage = useCallback(async () => {
-    try {
-      const userMessage = {
-        role: 'user',
-        content: `I'm writing a ${essayInfo?.postType || 'essay'} ${essayInfo?.title ? `titled "${essayInfo.title}"` : ''} ${essayInfo?.prompt ? `based on the prompt: "${essayInfo.prompt}"` : ''}. I'm currently working on the ${sectionType} section. Can you provide some guidance to help me improve this part of my essay?`
-      };
+CRITICAL - OFF-TOPIC HANDLING:
+When a user asks ANY question not directly related to their essay or writing process, respond ONLY with:
+"I'm focused on helping you with your writing. Let's get back to your essay!"
 
-      const aiResponse = await llm.invoke([systemMessage, userMessage]);
+OUTPUT FORMATTING RULES:
+- Always start with an italicized greeting on its own line
+- Add a blank line after greeting
+- Use **bold** for emphasis and key terms
+- Each question should be on its own line with a bullet point
+- Add a blank line between questions
+- End with an encouraging note on its own line
 
-      setMessages([{ role: 'assistant', content: aiResponse.content }]);
-    } catch (error) {
-      console.error('Error sending initial message:', error);
-      setMessages([{ role: 'assistant', content: 'Hello! How can I assist you with your essay today?' }]);
-    }
-  }, [llm, systemMessage, essayInfo, sectionType]);
+EXAMPLE PROPER FORMATTING:
+
+*Welcome! Let's work on making your essay stronger.*
+
+* **What central argument** do you want to develop in this section?
+
+* **Which supporting evidence** could strengthen your point?
+
+* **How does this connect** to your essay's main theme?
+
+Keep going - you're building something great!
+
+STRICT RULES:
+- Maintain consistent spacing between elements
+- Always include blank lines between questions
+- Keep the visual hierarchy clear
+- Never skip the formatting rules
+- For off-topic questions, use only the redirect message with no additional text
+
+REMEMBER: The formatting is as important as the content for readability.`
+}), []);
+
+const sendInitialMessage = useCallback(async () => {
+  try {
+    const userMessage = {
+      role: 'user',
+      content: `I need help with essay writing. I'm working on the ${sectionType} section of my essay addressing this prompt: "${essayInfo.prompt}". Here's my current content:
+"${currentContent}"
+Please provide guidance for developing this section.`
+    };
+
+    // Add context message to make it clear this is essay-related
+    const contextMessage = {
+      role: 'system',
+      content: `This is an essay writing request. The student is working on their ${sectionType} and needs writing guidance. Treat this as an on-topic essay help request.`
+    };
+
+    const aiResponse = await llm.invoke([
+      systemMessage,
+      contextMessage,
+      userMessage
+    ]);
+
+    setMessages([{ role: 'assistant', content: aiResponse.content }]);
+  } catch (error) {
+    console.error('Error sending initial message:', error);
+    setMessages([{ 
+      role: 'assistant', 
+      content: 'Hello! How can I assist you with your essay today?' 
+    }]);
+  }
+}, [llm, systemMessage, essayInfo, sectionType, currentContent]);
 
   useEffect(() => {
     if (isOpen && isInitialMount.current && llm) {
@@ -112,25 +109,50 @@ const WritingAssistant = ({ isOpen, onClose, sectionType, essayInfo, currentCont
     }
   }, [isOpen, llm, sendInitialMessage]);
 
+  // Add this useEffect to reset the chat when section changes
+  useEffect(() => {
+    isInitialMount.current = true;
+    setMessages([]);
+  }, [sectionType]);
+
+  // And update the useEffect for initial message to also trigger on sectionType change
+  useEffect(() => {
+    if (isOpen && isInitialMount.current && llm) {
+      sendInitialMessage();
+      isInitialMount.current = false;
+    }
+  }, [isOpen, llm, sendInitialMessage, sectionType]); // Added sectionType dependency
+
   const handleSend = async () => {
     if (inputMessage.trim() === '' || !llm) return;
-
+  
     const userMessage = { role: 'user', content: inputMessage };
     setMessages(prevMessages => [...prevMessages, userMessage]);
     setInputMessage('');
-
+  
     try {
+      const contextMessage = {
+        role: 'system',
+        content: `The student is working on their ${sectionType} section for an essay about: "${essayInfo.prompt}". Maintain essay writing assistance context.`
+      };
+  
       const aiResponse = await llm.invoke([
         systemMessage,
+        contextMessage,
         ...messages,
-        userMessage,
-        { role: 'user', content: `Remember, I'm working on the ${sectionType} section of my essay.` }
+        userMessage
       ]);
-
-      setMessages(prevMessages => [...prevMessages, { role: 'assistant', content: aiResponse.content }]);
+  
+      setMessages(prevMessages => [...prevMessages, { 
+        role: 'assistant', 
+        content: aiResponse.content 
+      }]);
     } catch (error) {
       console.error('Error calling Groq API:', error);
-      setMessages(prevMessages => [...prevMessages, { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' }]);
+      setMessages(prevMessages => [...prevMessages, { 
+        role: 'assistant', 
+        content: 'Sorry, I encountered an error. Please try again.' 
+      }]);
     }
   };
 
