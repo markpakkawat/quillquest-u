@@ -71,3 +71,16 @@ exports.getUserProfileById = async (req, res, next) => {
     next(error);
   }
 };
+
+exports.checkEmailAvailability = async (req, res, next) => {
+  try {
+    const email = req.query.email;
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.json({ available: false });
+    }
+    res.json({ available: true });
+  } catch (error) {
+    next(error);
+  }
+};
