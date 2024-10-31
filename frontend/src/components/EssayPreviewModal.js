@@ -64,12 +64,6 @@ const EssayPreviewModal = ({ sections, essayInfo }) => {
           <h2 className="text-xl font-semibold">Full Essay Preview</h2>
           <div className="flex gap-2">
             <button
-              onClick={handleDownload}
-              className="px-3 py-1 text-sm rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100"
-            >
-              Download
-            </button>
-            <button
               onClick={() => setIsOpen(false)}
               className="text-white bg-red-500 hover:bg-black"
             >
