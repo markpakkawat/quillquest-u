@@ -1,0 +1,52 @@
+/* src/assets/css/components/TextEditor.css */
+.text-editor-wrapper {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.ProseMirror {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  text-align: left;
+  border: none;
+}
+
+.ProseMirror:focus {
+  outline: none;
+}
+
+.ProseMirror p {
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  max-width: 100%;
+}
+
+.ProseMirror * {
+  max-width: 100%;
+}
+
+.ProseMirror img, .ProseMirror video {
+  max-width: 100%;
+  height: auto;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #adb5bd;
+  pointer-events: none;
+  height: 0;
+}
+
+.ProseMirror .highlight {
+  background-color: rgba(255, 255, 0, 0.3);
+  text-decoration: underline wavy red;
+}
+
+.ProseMirror .highlight::selection {
+  background-color: rgba(255, 255, 0, 0.5);
+}

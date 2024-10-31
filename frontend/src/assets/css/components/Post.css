@@ -1,0 +1,128 @@
+.post {
+  background-color: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  width: 90%; /* Adjusted width to look similar to the second image */
+  max-width: 800px; /* Limit max width */
+  margin-bottom: 20px;
+  
+}
+
+.Link:hover{
+  text-decoration: none;
+}
+
+.post-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.user-info {
+  display: flex;
+}
+
+.user-icon {
+  background-color: #6200ea;
+  color: white;
+  font-weight: bold;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 20px;
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+  align-items: last baseline;
+}
+
+.username {
+  font-weight: bold;
+}
+
+.time {
+  color: gray;
+  font-size: 0.85rem;
+}
+
+.post-title {
+  margin: 0 0 15px;
+  font-size: 1.5rem;
+  text-align: left; /* Ensure left alignment */
+}
+
+.post-image img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin-bottom: 15px;
+}
+
+.post-content {
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #333;
+}
+
+.post-prompt .prompt-tag {
+  background-color: #ececec;
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 0.9rem;
+  margin-bottom: 10px;
+  display: inline-block;
+}
+
+.post-footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+}
+
+.like-button {
+  background-color: transparent;
+  border: none;
+  font-size: 1rem;
+  color: #6200ea;
+  cursor: pointer;
+  margin: 20px;
+}
+
+
+.like-button:hover, .comment-button:hover {
+  text-decoration: none;
+}
+
+.unlike-button {
+  background-color: transparent;
+  border: none;
+  font-size: 1rem;
+  color: #6200ea;
+  cursor: pointer;
+  margin: 20px;
+}
+
+.unlike-button:hover {
+  text-decoration: none;
+}
+
+.comment-button {
+  background-color: transparent;
+  border: none;
+  font-size: 1rem;
+  color: #6200ea;
+  cursor: pointer;
+  margin: 20px;
+}
+
+.post-type{
+  display: flex;
+  margin-left: 2rem;
+  margin-bottom: 1rem;
+}

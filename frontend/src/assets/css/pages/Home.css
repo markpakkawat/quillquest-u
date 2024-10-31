@@ -1,0 +1,61 @@
+.home-container {
+    background-color: #f8f8f8;
+    padding: 80px 20px 20px; /* Padding adjusted to avoid overlap with fixed navbar */
+    min-height: 1024px;
+}
+
+.post-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    align-items: center; /* Center align posts */
+}
+
+.home-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  
+  .content-wrapper {
+    display: flex;
+    flex: 1;
+  }
+  
+  .prompts-sidebar {
+    width: 300px;
+    padding: 20px;
+    background-color: #f0f0f0;
+    overflow-y: auto;
+  }
+  
+  .prompt-card {
+    background-color: white;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  
+  .prompt-card h3 {
+    margin-top: 0;
+    font-size: 18px;
+  }
+  
+  .prompt-card p {
+    font-size: 14px;
+    color: #666;
+  }
+  
+  .post-feed {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+  }
+
+  .prompt-card.expired {
+    opacity: 0.5;
+    background-color: #f0f0f0;
+  }
+  
+  /* Add any additional styles for your Post component here */

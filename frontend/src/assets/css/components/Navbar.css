@@ -1,0 +1,155 @@
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 20px;
+  background-color: white;
+  border-radius: 25px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  position: fixed;
+  top: -5px;
+  left: 0px;
+  right: 0px;
+  z-index: 1000;
+}
+
+.navbar-left {
+  display: flex;
+  align-items: center;
+}
+
+.logo-image {
+  height: 50px; 
+  margin-right: 10px;
+}
+
+.logo-text {
+  font-size: 1.5rem;
+  font-family: 'McLaren', cursive;
+  color: #9500F0;
+}
+
+.navbar-center {
+  display: flex;
+  align-items: center;
+}
+
+.home {
+  background-color: #D9D9D9;
+  padding-left: 0.75rem;
+  padding-right: 0.5rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-start-start-radius: 0.5rem; /* 8px */
+  border-end-start-radius: 0.5rem; /* 8px */
+}
+
+.home:hover{
+  background-color: #333;
+  color: white;
+}
+
+.create {
+  background-color: #D9D9D9;
+  padding-left: 0.5rem;
+  padding-right: 0.75rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-start-end-radius: 0.5rem; /* 8px */
+  border-end-end-radius: 0.5rem; /* 8px */
+}
+
+.create:hover{
+  background-color: #333;
+  color: white;
+}
+
+.nav-links li:hover {
+  background-color: #9500F0;
+}
+
+.nav-links li:hover a {
+  color: #fff;
+  background-color: #9500F0;
+  border-radius: 25px;
+}
+
+.navbar-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 20%;
+}
+
+.icon-button {
+  background-color: transparent;
+  color: #000;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0.5rem;
+  height: 40px;
+  width: 40px;
+}
+
+.user-icon {
+  background-color: #9500F0; /* สีพื้นหลัง */
+  color: white; /* สีของตัวอักษร */
+  font-weight: bold;
+  border-radius: 50%; /* ทำให้เป็นวงกลม */
+  width: 40px; /* ความกว้าง */
+  height: 40px; /* ความสูง */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: 20px; /* ขนาดของตัวอักษร */
+  box-sizing: border-box; /* ทำให้ padding ไม่ส่งผลต่อขนาด */
+  margin: 0.5rem;
+}
+
+.navbar-profile {
+  position: relative;
+}
+
+.profile-btn {
+  background-color: #9500F0;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  border-radius: 5px;
+}
+
+.dropdown-arrow {
+  margin-left: 0.5rem;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background-color: white;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  width: 150px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.dropdown-item {
+  font-size: small;
+  padding: 0.5rem 1rem;
+  display: block;
+  color: #333;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.dropdown-item:hover {
+  text-decoration: none;
+  background-color: #f0f0f0;
+}
+
