@@ -235,7 +235,7 @@ const Profile = () => {
                     {post.title}
                   </Link>
                   <p className="text-sm text-gray-600 mb-1">{new Date(post.createdAt).toLocaleString()}</p>
-                  <div dangerouslySetInnerHTML={{ __html: post.content }} />
+                  <div className="max-w-2xl mx-auto p-6 text-justify whitespace-pre-wrap leading-relaxed" dangerouslySetInnerHTML={{ __html: post.content }} />
                 </div>
               ))}
             </div>
