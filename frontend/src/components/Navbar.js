@@ -20,6 +20,7 @@ const Navbar = () => {
   const dropdownRef = useRef(null);
   const notificationRef = useRef(null);
   const [error, setError] = useState('');
+  const [isCreateHovered, setIsCreateHovered] = useState(false);
 
   // Toggle dropdown visibility
   const toggleDropdown = () => {
@@ -129,10 +130,10 @@ const Navbar = () => {
   }, [auth.user, auth.token]);
 
   return (
-    <nav className="flex justify-between items-center bg-[white] shadow-[0_2px_5px_rgba(0,0,0,0.1)] fixed top-[-5px] z-[1000] px-5 py-[5px] rounded-[25px] inset-x-0">
+    <nav className="flex justify-between items-center bg-[white] shadow-[0_2px_5px_rgba(0,0,0,0.1)] fixed top-[-5px] z-[1000] px-5 py-[5px] inset-x-0">
       <div className="flex items-center">
         <Link to="/home"><img src={logo} alt="Logo" className="h-[50px] mr-2.5" /></Link>
-        <div className="text-2xl text-[#9500F0] font-['Mclaren'] hidden sm:block">Quillquest</div>
+        <div className="text-3xl text-[#9500F0] font-['Righteous'] hidden sm:block">Quillquest</div>
       </div>
 
       <div className="flex items-center justify-end w-auto space-x-2">
@@ -142,8 +143,20 @@ const Navbar = () => {
 
 
         <div className="hidden lg:flex items-center ">
-          <Link to="/home" className='bg-[#D9D9D9] pl-3 pr-2 py-2 hover:bg-[#333] hover:text-[white] rounded-l-xl'> Home <HomeIcon /></Link>
-          <Link to="/essayguidance" className='bg-[#D9D9D9] pl-2 pr-3 py-2 hover:bg-[#333] hover:text-[white] rounded-r-xl'> Create  <EditIcon /></Link>
+          <Link 
+            to="/home" 
+            className={`bg-[#D9D9D9] pl-3 pr-2 py-2 rounded-l-xl ${isCreateHovered ? 'bg-[#D9D9D9] text-black' : 'bg-[#333] text-white'}`}
+          > 
+            Home <HomeIcon />
+          </Link>
+          <Link 
+            to="/essayguidance" 
+            className='bg-[#D9D9D9] pl-2 pr-3 py-2 hover:bg-[#333] hover:text-[white] rounded-r-xl'
+            onMouseEnter={() => setIsCreateHovered(true)}
+            onMouseLeave={() => setIsCreateHovered(false)}
+          > 
+            Create <EditIcon />
+          </Link>
         </div>
 
 
