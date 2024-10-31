@@ -137,28 +137,33 @@ const Navbar = () => {
       </div>
 
       <div className="flex items-center justify-end w-auto space-x-2">
-        <button className="lg:hidden bg-[#D9D9D9] mt-0 text-black px-3 py-2 rounded-md hover:text-white hover:bg-[black]" onClick={toggleDropdown}>
-          <Link to="/essayguidance" className=''> Create  <EditIcon /></Link>
-        </button>
-
-
-        <div className="hidden lg:flex items-center ">
-          <Link 
-            to="/home" 
-            className={`bg-[#D9D9D9] pl-3 pr-2 py-2 rounded-l-xl ${isCreateHovered ? 'bg-[#D9D9D9] text-black' : 'bg-[#333] text-white'}`}
-          > 
-            Home <HomeIcon />
-          </Link>
-          <Link 
-            to="/essayguidance" 
-            className='bg-[#D9D9D9] pl-2 pr-3 py-2 hover:bg-[#333] hover:text-[white] rounded-r-xl'
-            onMouseEnter={() => setIsCreateHovered(true)}
-            onMouseLeave={() => setIsCreateHovered(false)}
-          > 
+        <div className="lg:hidden">
+          <Link to="/essayguidance" className="bg-[#D9D9D9] px-3 py-2 rounded-md hover:text-white hover:bg-[black] flex items-center">
             Create <EditIcon />
           </Link>
         </div>
 
+
+        <div className="hidden lg:flex items-center">
+          <Link 
+            to="/home" 
+            className={`pl-3 pr-2 py-2 rounded-l-xl flex items-center ${
+              isCreateHovered ? 'bg-[#D9D9D9] text-black' : 'bg-[#333] text-white'
+            } transition-colors duration-200`}
+          > 
+            Home <HomeIcon className="ml-1" />
+          </Link>
+          <Link 
+            to="/essayguidance" 
+            className={`pl-2 pr-3 py-2 rounded-r-xl flex items-center ${
+              isCreateHovered ? 'bg-[#333] text-white' : 'bg-[#D9D9D9] text-black'
+            } transition-colors duration-200`}
+            onMouseEnter={() => setIsCreateHovered(true)}
+            onMouseLeave={() => setIsCreateHovered(false)}
+          > 
+            Create <EditIcon className="ml-1" />
+          </Link>
+        </div>
 
         <div ref={notificationRef} className="relative">
           <button
