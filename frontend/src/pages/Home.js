@@ -78,7 +78,7 @@ const Home = () => {
       <Navbar />
       <div className="flex flex-col lg:flex-row gap-5 w-full max-w-6xl mx-auto mt-5">
         {/* Prompts Section */}
-        <div className="rounded-lg w-full lg:w-[30%] bg-[#f0f0f0] p-5 max-h-[80vh] sticky top-24 prompt-container">
+        <div className="rounded-lg w-full lg:w-[30%] bg-[#ffffff] p-5 max-h-[80vh] sticky top-24 prompt-container shadow-md">
           <div className="h-full overflow-y-auto ios-scrollbar">
             <ul role="list" className="divide-y divide-gray-200 dark:divide-gray-300">
               {prompts.map((prompt, index) => (
