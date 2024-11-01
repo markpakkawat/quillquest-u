@@ -91,18 +91,18 @@ const Register = () => {
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-
+  
     const validationErrors = validate();
     setErrors(validationErrors);
-
+  
     if (Object.keys(validationErrors).length > 0) {
       return; // Stop submission if there are validation errors
     }
-
+  
     setIsSubmitting(true);
     setServerError('');
     setNotification({ message: '', type: '' });
-
+  
     try {
       // Check email availability before registering
       const emailCheckResponse = await api.get(`/users/check-email?email=${formData.email}`);
@@ -111,24 +111,19 @@ const Register = () => {
         setIsSubmitting(false);
         return;
       }
-
+  
       const response = await api.post('/auth/register', {
         username: formData.username,
         email: formData.email,
         password: formData.password,
       });
-
-      // Assuming backend returns token and user info
-      const { token, user } = response.data;
-
-      // Store token in localStorage or any state management
-      localStorage.setItem('token', token);
-      // Update auth state using context
-      login(token, user);
-
-      // Redirect to dashboard or home page
-      setNotification({ message: 'Registration successful! Redirecting...', type: 'success' });
-      setTimeout(() => navigate('/home'), 2000);
+  
+      // After successful registration
+      setNotification({ message: 'Registration successful! Please check your email to verify your account.', type: 'success' });
+      
+      // Instead of logging in immediately, inform user about email verification
+      setTimeout(() => navigate('/verify-email-instructions'), 3000);
+  
     } catch (error) {
       if (error.response && error.response.data) {
         setServerError(error.response.data.message || 'Registration failed');
@@ -138,7 +133,7 @@ const Register = () => {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  };  
 
   return (
     <div className="register-container">

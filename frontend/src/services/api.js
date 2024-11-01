@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { logout } from '../context/AuthContext.js'; // Import the logout function
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001';
 
@@ -7,7 +8,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 60000, // 15000 timeout to 15 seconds
+  timeout: 60000, // 60-second timeout
 });
 
 // Add request interceptor
@@ -26,11 +27,18 @@ api.interceptors.request.use(
   }
 );
 
-// Add response interceptor
+let logoutHandler;
+
+export const setLogoutHandler = (params) => {
+  logoutHandler = logout;
+};
+
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.code === 'ECONNABORTED') {
+    if (error.response && error.response.status === 401 && logoutHandler) {
+      logoutHandler(); // Call the logout function when a 401 response is received
+    } else if (error.code === 'ECONNABORTED') {
       console.error('Request timed out');
     } else if (!error.response) {
       console.error('Network error:', error.message);

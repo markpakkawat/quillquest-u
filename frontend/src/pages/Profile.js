@@ -5,18 +5,18 @@ import api from '../services/api';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { Link } from 'react-router-dom';
 
-const Notification = ({ message, type, onClose }) => {
-  if (!message) return null;
+// const Notification = ({ message, type, onClose }) => {
+//   if (!message) return null;
 
-  const notificationClass =
-    type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700';
+//   const notificationClass =
+//     type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700';
 
-  return (
-    <div className={`space-x-2 border p-1 w-auto rounded-xl ${notificationClass}`} role="alert">
-      <span>{message}</span>
-    </div>
-  );
-};
+//   return (
+//     <div className={`space-x-2 border p-1 w-auto rounded-xl ${notificationClass}`} role="alert">
+//       <span>{message}</span>
+//     </div>
+//   );
+// };
 const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [username, setUsername] = useState(null);
@@ -35,11 +35,11 @@ const Profile = () => {
     try {
       const token = localStorage.getItem('token');
       // Check email availability before updating profile
-      const emailCheckResponse = await api.get(`/users/check-email?email=${email}`);
-      if (!emailCheckResponse.data.available) {
-        setNotification({ message: 'Email is already in use. Please choose a different one.', type: 'error' });
-        return;
-      }
+      // const emailCheckResponse = await api.get(`/users/check-email?email=${email}`);
+      // if (!emailCheckResponse.data.available) {
+      //   setNotification({ message: 'Email is already in use. Please choose a different one.', type: 'error' });
+      //   return;
+      // }
       const response = await api.put(
         '/users/profile',
         {
@@ -153,10 +153,10 @@ const Profile = () => {
     return <p>{error}</p>;
   }
 
-  const handleEmailChange = (e) => {
-    setEmail(e.target.value);
-    setNotification({ message: '', type: '' }); // Clear notification when the user starts editing the email field
-  };
+  // const handleEmailChange = (e) => {
+  //   setEmail(e.target.value);
+  //   setNotification({ message: '', type: '' }); // Clear notification when the user starts editing the email field
+  // };
   return (
     <div className="bg-[white] min-h-screen pt-20 pb-5 px-5 flex flex-col items-center">
       <Navbar />
@@ -182,13 +182,17 @@ const Profile = () => {
                         type="text"
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
-                        className="w-full p-4 border rounded-2xl bg-[#D9D9D9] text-xl mb-4"
+                        className="bg-gray-50 w-full p-4 border rounded-2xl bg-[#D9D9D9] text-xl mb-4"
                         placeholder={profileData.username}
                       />
-                      <input
+                      <div className='flex'>
+                        <p className="text-2xl font-semibold">{profileData.email}</p>
+                      </div>
+                      
+                      {/* <input
                         type="email"
                         value={email}
-                        onChange={handleEmailChange}
+                        // onChange={handleEmailChange}       Disable temporary
                         className="w-full p-4 border rounded-2xl bg-[#D9D9D9] text-xl"
                         placeholder={profileData.email}
                       />
@@ -196,7 +200,7 @@ const Profile = () => {
                         message={notification.message}
                         type={notification.type}
                         onClose={() => setNotification({ message: '', type: '' })}
-                      />
+                      /> */}
                     </>
                   ) : (
                     <div className='flex-col mt-10 ml-10'>
