@@ -80,11 +80,11 @@ const Post = ({ post }) => {
         <div className="flex">
           <div className={`${avatarColor} text-[white] font-[bold] w-10 h-10 flex items-center justify-center mr-5 rounded-[50%]`}>
             <span className='font-sans font-bold'>
-              {post.userId.username.charAt(0).toUpperCase()}
+              {post.userId?.username.charAt(0).toUpperCase()}
             </span>
           </div>
           <div className="flex flex-col items-baseline">
-            <span className="font-semibold text-black">{post.userId.username}</span>
+            <span className="font-semibold text-black">{post.userId?.username || "unknown"}</span>
             <span className="text-[gray] text-[0.85rem]"> • {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}</span>
           </div>
         </div>
@@ -94,7 +94,7 @@ const Post = ({ post }) => {
         <div className="flex mb-2.5">
           {post.postType && <div className="bg-[#9500F0] text-white text-[0.9rem] inline-block px-4 py-1 rounded-[1rem]">{post.postType}</div>}
         </div>
-        <div dangerouslySetInnerHTML={{ __html: post.content }} />
+        <div className="max-w-2xl mx-auto p-6 text-justify whitespace-pre-wrap leading-relaxed" dangerouslySetInnerHTML={{ __html: post.content }} />
       </div>
     </Link>
 

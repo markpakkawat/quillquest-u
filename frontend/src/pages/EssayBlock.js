@@ -28,6 +28,15 @@ const ERROR_CATEGORIES = [
   'stylistic',
   'typographical'
 ];
+
+// Add this loading circle component
+const LoadingCircle = () => (
+  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+  </svg>
+);
+
 const CHECK_COOLDOWN = 30; // 30 seconds cooldown
 
 const ERROR_COLORS = {
@@ -124,7 +133,7 @@ const SidebarItem = ({
                   onDelete(id);
                 }
               }}
-              className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 
+              className="w-auto mt-0 opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 
                 hover:text-red-500 rounded-full hover:bg-red-50
                 transition-all duration-200"
             >
@@ -181,14 +190,14 @@ const AddBodyParagraphButton = ({ onClick }) => (
 
       <button
         onClick={onClick}
-        className="flex-grow bg-purple-600 rounded-lg py-3 px-4 
+        className="flex-grow bg-purple-600 rounded-lg 
           text-white font-medium
           transform transition-all duration-200
           hover:bg-purple-700
           active:scale-[0.99]
           focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
       >
-        <div className="flex items-center justify-center space-x-2">
+        <div className="flex items-center justify-center space-x-2 ">
           <span>Add Body Paragraph</span>
           <PlusIcon className="h-5 w-5" />
         </div>
@@ -536,13 +545,6 @@ export default function EssayBlock() {
   const toggleAssistant = () => setIsAssistantOpen(!isAssistantOpen);
 
   const handleCheck = async () => {
-    const now = Date.now();
-    if (now - lastCheckTime < CHECK_COOLDOWN * 1000) {
-      const remainingTime = Math.ceil((CHECK_COOLDOWN * 1000 - (now - lastCheckTime)) / 1000);
-      alert(`Please wait ${remainingTime} seconds before checking again.`);
-      return;
-    }
-  
     if (!essayContent.trim()) {
       alert('Please write something before checking for errors.');
       return;
@@ -553,7 +555,6 @@ export default function EssayBlock() {
       const categorizedErrors = await checkEssayErrors(essayContent);
       setErrors(categorizedErrors);
       setHighlightedContent(createHighlightedText(essayContent, categorizedErrors));
-      setLastCheckTime(now);
       setShowErrors(true);
       setHasChecked(true);
   
@@ -1013,9 +1014,6 @@ const renderErrorPanel = () => {
               sections={allSections} 
               essayInfo={essayInfo}
             />
-            <div className="text-purple-600 font-bold">
-              Score: {score}
-            </div>
             <button 
               className="bg-purple-600 text-white px-4 py-2 rounded-full flex items-center hover:bg-purple-500"
               onClick={toggleAssistant}
@@ -1041,7 +1039,7 @@ const renderErrorPanel = () => {
                 />
               </div>
               {hasChecked && (
-                <div className="h-[60px] px-4 border-t border-gray-200 flex justify-center items-center">
+                <div className="h-[120px] px-4 border-t border-gray-200 flex justify-center items-center">
                   <button
                     onClick={() => setShowErrors(!showErrors)}
                     className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-500 hover:bg-purple-200 transition-colors"
@@ -1121,22 +1119,40 @@ const renderErrorPanel = () => {
         </div>
 
         {/* Footer */}
-        <footer className="bg-white border-t border-gray-200 p-3 flex items-center justify-end space-x-3">
-          <button
-            onClick={handleCheck}
-            className="bg-blue-500 text-white px-8 py-2.5 rounded-full flex items-center text-sm disabled:opacity-50"
-            disabled={isChecking}
-          >
-            <CheckCircleIcon className="h-5 w-5 mr-2" />
-            {isChecking ? 'Checking...' : 'Check'}
-          </button>
-          <button
-            onClick={handleComplete}
-            disabled={isCompleting}
-            className="bg-green-500 text-white px-8 py-2.5 rounded-full flex items-center text-sm disabled:opacity-50"
-          >
-            {isCompleting ? 'Completing...' : 'Complete'}
-          </button>
+        <footer className="bg-white border-t border-gray-200 p-3 flex items-center justify-end">
+          <div className="flex items-center gap-3 mr-4">
+            <button
+              onClick={handleCheck}
+              className="bg-blue-500 text-white px-12 py-4 rounded-full flex items-center text-lg disabled:opacity-50 hover:bg-blue-600 transition-colors"
+              disabled={isChecking}
+            >
+              {isChecking ? (
+                <>
+                  <LoadingCircle />
+                  <span className="ml-4">Checking...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircleIcon className="h-10 w-10 mr-2" />
+                  <span>Check Grammar</span>
+                </>
+              )}
+            </button>
+            <button
+              onClick={handleComplete}
+              disabled={isCompleting}
+              className="bg-green-500 text-white px-12 py-4 rounded-full flex items-center text-lg disabled:opacity-50 hover:bg-green-600 transition-colors"
+            >
+              {isCompleting ? (
+                <>
+                  <LoadingCircle />
+                  <span className="ml-4">Completing...</span>
+                </>
+              ) : (
+                <span>Complete</span>
+              )}
+            </button>
+          </div>
         </footer>
         {/* Add this near the bottom of your render, before the WritingAssistant */}
         <CompletionRequirementsModal 

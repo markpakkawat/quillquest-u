@@ -1,8 +1,9 @@
 import React, { createContext, useState, useEffect } from 'react';
 import api from '../services/api';
+import { setLogoutHandler } from '../services/api';
 
 export const AuthContext = createContext();
-
+let logout; // Define the logout function to be exported later
 const AuthProvider = ({ children }) => {
   const [auth, setAuth] = useState({
     token: localStorage.getItem('token') || null,
@@ -28,12 +29,9 @@ const AuthProvider = ({ children }) => {
           localStorage.setItem('user', JSON.stringify(userData));
         } catch (error) {
           console.error('Error fetching user profile:', error);
-          setAuth({
-            token: null,
-            user: null,
-          });
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
+
+          // Token might be invalid or user might be deleted, so log out
+          logout();
         }
       }
     };
@@ -58,6 +56,9 @@ const AuthProvider = ({ children }) => {
       user: null,
     });
   };
+  useEffect(() => {
+    setLogoutHandler(logout); // Set the logout handler from the context
+  }, [logout]);
 
   return (
     <AuthContext.Provider value={{ auth, setAuth, login, logout }}>
@@ -66,4 +67,5 @@ const AuthProvider = ({ children }) => {
   );
 };
 
+export { logout };
 export default AuthProvider;

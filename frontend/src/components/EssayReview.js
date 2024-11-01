@@ -111,20 +111,13 @@ export const EssayReview = () => {
           <div className="flex items-center space-x-4">
             <button 
               onClick={() => navigate('/essaybuilder')} 
-              className="text-purple-600 hover:text-purple-700"
+              className="text-white-600 hover:bg-purple-400"
             >
               <HomeIcon className="h-6 w-6" />
             </button>
             <h1 className="text-2xl font-semibold">{essayInfo?.title}</h1>
           </div>
           <div className="flex items-center space-x-4">
-            <button
-              onClick={() => setShowWritingAssistant(true)}
-              className="bg-purple-600 text-white px-4 py-2 rounded-full flex items-center"
-            >
-              <ChatAlt2Icon className="h-5 w-5 mr-2" />
-              WRITING ASSISTANT
-            </button>
             <button
               onClick={handlePost}
               disabled={isPosting}
@@ -140,7 +133,7 @@ export const EssayReview = () => {
         <main className="flex-1 p-6">
           <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg p-6">
             <div className="space-y-4">
-              <div className="prose max-w-none">
+              <div className="prose max-w-none text-left">
                 {allSections?.map((section, index) => (
                   <div key={section.id} className="mb-8">
                     <h2 className="text-xl font-semibold mb-4">{section.title}</h2>

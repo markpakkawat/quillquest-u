@@ -79,7 +79,7 @@ const PostDetail = () => {
       setLoading(false); // Set loading to false once data is loaded
 
       // Fetch user avatar color
-      const userProfileResponse = await api.get(`/users/${response.data.userId._id}/profile`, {
+      const userProfileResponse = await api.get(`/users/${response.data.userId?._id}/profile`, {
         headers: {
           Authorization: `Bearer ${auth.token}`,
         },
@@ -196,7 +196,7 @@ const handleCloseDeleteModal = () => {
         <div className="bg-white p-5 rounded-lg">
           <div className='flex items-center mb-5'>
             <div className={`${avatarColor} text-white font-bold w-10 h-10 flex items-center justify-center overflow-hidden text-xl rounded-full mr-5`}>
-              {post.userId.username.charAt(0).toUpperCase()}
+              {post.userId?.username.charAt(0).toUpperCase()}
             </div>
             <div className="flex flex-col">
               <div className='flex'>
@@ -242,7 +242,7 @@ const handleCloseDeleteModal = () => {
               <div className="flex mb-4">
                 {post.postType && <div className="bg-[#9500F0] text-white text-sm inline-block px-4 py-1 rounded-full">{post.postType}</div>}
               </div>
-              <div className="mb-5" dangerouslySetInnerHTML={{ __html: post.content }} />
+              <div className="max-w-2xl mx-auto p-6 text-justify whitespace-pre-wrap leading-relaxed" dangerouslySetInnerHTML={{ __html: post.content }} />
             </>
           )}
           <div className="flex items-center justify-between mb-5">
@@ -256,7 +256,7 @@ const handleCloseDeleteModal = () => {
               <ChatBubbleOutlineIcon className="text-[#9500F0] cursor-pointer mr-3" />
               <span className='mr-5 font-mono'>{comments}</span>
             </div>
-            {!isEditing && auth.user.id === post.userId._id && (
+            {!isEditing && auth.user?.id === post.userId?._id && (
               <div className='flex items-center'>
                 <button onClick={handleEdit} 
                 className='mr-5 h-[50px] text-md w-auto mt-0 px-2 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700'>
@@ -273,7 +273,7 @@ const handleCloseDeleteModal = () => {
           </div>
           <hr className="my-5" />
           {/* Comments Section */}
-          <Comment postId={post._id} onCommentsUpdate={updateCommentsCount} onReplyUpdate={handleReplyUpdate} />
+          <Comment postId={post?._id} onCommentsUpdate={updateCommentsCount} onReplyUpdate={handleReplyUpdate} />
         </div>
         {/* Show Delete Modal if needed */}
       {showDeleteModal && (

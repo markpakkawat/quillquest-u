@@ -15,6 +15,8 @@ import EssayGuidance from './pages/EssayGuidance';
 import EssayBuilder from './pages/EssayBuilder';
 import EssayBlock from './pages/EssayBlock';
 import { EssayReview } from './components/EssayReview';
+import EmailVerificationInstructions from './pages/EmailVerificationInstructions';
+import VerifyEmail from './pages/VerifyEmail';
 
 function App() {
   return (
@@ -28,6 +30,8 @@ function App() {
           <Route path="/" element={<AuthenticatedRoute><Login /></AuthenticatedRoute>} />
           <Route path="/login" element={<AuthenticatedRoute><Login /></AuthenticatedRoute>} />
           <Route path="/register" element={<AuthenticatedRoute><Register /></AuthenticatedRoute>} />
+          <Route path="/verify-email-instructions" element={<AuthenticatedRoute><EmailVerificationInstructions /></AuthenticatedRoute>} />
+          <Route path='/verify-email' element={<AuthenticatedRoute><VerifyEmail/></AuthenticatedRoute>}/>
 
           {/* Protected routes for authenticated users only */}
 
