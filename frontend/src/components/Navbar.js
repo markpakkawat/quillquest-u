@@ -20,6 +20,7 @@ const Navbar = () => {
   const dropdownRef = useRef(null);
   const notificationRef = useRef(null);
   const [error, setError] = useState('');
+  const [isCreateHovered, setIsCreateHovered] = useState(false);
 
   // Toggle dropdown visibility
   const toggleDropdown = () => {
@@ -129,23 +130,40 @@ const Navbar = () => {
   }, [auth.user, auth.token]);
 
   return (
-    <nav className="flex justify-between items-center bg-[white] shadow-[0_2px_5px_rgba(0,0,0,0.1)] fixed top-[-5px] z-[1000] px-5 py-[5px] rounded-[25px] inset-x-0">
+    <nav className="flex justify-between items-center bg-[white] shadow-[0_2px_5px_rgba(0,0,0,0.1)] fixed top-[-5px] z-[1000] px-5 py-[5px] inset-x-0">
       <div className="flex items-center">
         <Link to="/home"><img src={logo} alt="Logo" className="h-[50px] mr-2.5" /></Link>
-        <div className="text-2xl text-[#9500F0] font-['Mclaren'] hidden sm:block">Quillquest</div>
+        <div className="text-3xl text-[#9500F0] font-['Righteous'] hidden sm:block">Quillquest</div>
       </div>
 
       <div className="flex items-center justify-end w-auto space-x-2">
-        <button className="lg:hidden bg-[#D9D9D9] mt-0 text-black px-3 py-2 rounded-md hover:text-white hover:bg-[black]" onClick={toggleDropdown}>
-          <Link to="/essayguidance" className=''> Create  <EditIcon /></Link>
-        </button>
-
-
-        <div className="hidden lg:flex items-center ">
-          <Link to="/home" className='bg-[#D9D9D9] pl-3 pr-2 py-2 hover:bg-[#333] hover:text-[white] rounded-l-xl'> Home <HomeIcon /></Link>
-          <Link to="/essayguidance" className='bg-[#D9D9D9] pl-2 pr-3 py-2 hover:bg-[#333] hover:text-[white] rounded-r-xl'> Create  <EditIcon /></Link>
+        <div className="lg:hidden">
+          <Link to="/essayguidance" className="bg-[#D9D9D9] px-3 py-2 rounded-md hover:text-white hover:bg-[black] flex items-center">
+            Create <EditIcon />
+          </Link>
         </div>
 
+
+        <div className="hidden lg:flex items-center">
+          <Link 
+            to="/home" 
+            className={`pl-3 pr-2 py-2 rounded-l-xl flex items-center ${
+              isCreateHovered ? 'bg-[#D9D9D9] text-black' : 'bg-[#333] text-white'
+            } transition-colors duration-200`}
+          > 
+            Home <HomeIcon className="ml-1" />
+          </Link>
+          <Link 
+            to="/essayguidance" 
+            className={`pl-2 pr-3 py-2 rounded-r-xl flex items-center ${
+              isCreateHovered ? 'bg-[#333] text-white' : 'bg-[#D9D9D9] text-black'
+            } transition-colors duration-200`}
+            onMouseEnter={() => setIsCreateHovered(true)}
+            onMouseLeave={() => setIsCreateHovered(false)}
+          > 
+            Create <EditIcon className="ml-1" />
+          </Link>
+        </div>
 
         <div ref={notificationRef} className="relative">
           <button

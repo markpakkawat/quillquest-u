@@ -94,7 +94,7 @@ const Post = ({ post }) => {
         <div className="flex mb-2.5">
           {post.postType && <div className="bg-[#9500F0] text-white text-[0.9rem] inline-block px-4 py-1 rounded-[1rem]">{post.postType}</div>}
         </div>
-        <div dangerouslySetInnerHTML={{ __html: post.content }} />
+        <div className="max-w-2xl mx-auto p-6 text-justify whitespace-pre-wrap leading-relaxed" dangerouslySetInnerHTML={{ __html: post.content }} />
       </div>
     </Link>
 

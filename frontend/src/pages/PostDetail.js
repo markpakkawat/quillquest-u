@@ -242,7 +242,7 @@ const handleCloseDeleteModal = () => {
               <div className="flex mb-4">
                 {post.postType && <div className="bg-[#9500F0] text-white text-sm inline-block px-4 py-1 rounded-full">{post.postType}</div>}
               </div>
-              <div className="mb-5" dangerouslySetInnerHTML={{ __html: post.content }} />
+              <div className="max-w-2xl mx-auto p-6 text-justify whitespace-pre-wrap leading-relaxed" dangerouslySetInnerHTML={{ __html: post.content }} />
             </>
           )}
           <div className="flex items-center justify-between mb-5">
