@@ -15,6 +15,7 @@ import CompletionButton from '../components/CompletionButton';
 import EssayPreviewModal from '../components/EssayPreviewModal';
 import SectionPreview from '../components/SectionPreview';
 import { CompletionRequirementsModal } from '../components/CompletionRequirementsModal';
+import { saveErrorStats, saveCompletenessStats } from '../utils/errorTracking';
 
 
 
@@ -227,6 +228,7 @@ export default function EssayBlock() {
   const [isRevision] = useState(false);
   const [hasExistingBodyParagraphs, setHasExistingBodyParagraphs] = useState(false);
   const [existingBodyParagraphs, setExistingBodyParagraphs] = useState([]);
+  
 
   useEffect(() => {
     if (allSections) {
@@ -553,6 +555,10 @@ export default function EssayBlock() {
     setIsChecking(true);
     try {
       const categorizedErrors = await checkEssayErrors(essayContent);
+      
+      // Save error statistics
+      await saveErrorStats(sectionId, categorizedErrors, section?.title);
+      
       setErrors(categorizedErrors);
       setHighlightedContent(createHighlightedText(essayContent, categorizedErrors));
       setShowErrors(true);
@@ -565,11 +571,7 @@ export default function EssayBlock() {
         setActiveErrorCategory(firstCategoryWithErrors);
       }
   
-      const totalErrors = Object.values(categorizedErrors).flat().length;
-      const newScore = Math.max(0, score + (10 - totalErrors));
-      setScore(newScore);
-  
-      if (totalErrors === 0) {
+      if (Object.values(categorizedErrors).flat().length === 0) {
         alert('Great job! No errors found in this section. 🎉');
       }
     } catch (error) {
@@ -599,7 +601,7 @@ const handleComplete = async () => {
     const previousContent = prevSectionId ? localStorage.getItem(`essayContent_${prevSectionId}`) : null;
     const hasPreviousContent = localStorage.getItem(`essayContent_${sectionId}`)?.trim();
 
-    // Now we can use hasPreviousContent since it's been declared
+    // Get section types
     const isIntroduction = section?.title.toLowerCase().includes('introduction');
     const isBodyParagraph = section?.title.toLowerCase().includes('body paragraph');
     const isConclusion = section?.title.toLowerCase().includes('conclusion');
@@ -611,12 +613,15 @@ const handleComplete = async () => {
       previousContent
     );
 
-    // Initialize updatedSections at the beginning
+    // Save completeness statistics
+    await saveCompletenessStats(sectionId, completenessAnalysis, section?.title);
+
+    // Initialize updatedSections
     let updatedSections = allSections.map(s => 
       s.id === sectionId ? { ...s, percentage: 50 } : s
     );
 
-    // Handle sections based on type and completeness
+    // Handle Body Paragraphs
     if (isBodyParagraph) {
       // Check if there's a next body paragraph
       const nextBodyParagraph = nextSectionIndex < allSections.length && 
@@ -629,7 +634,7 @@ const handleComplete = async () => {
       if (completenessAnalysis.isComplete) {
         localStorage.removeItem(`sectionRequirements_${sectionId}`);
         
-        const updatedSections = allSections.map(s => 
+        updatedSections = allSections.map(s => 
           s.id === sectionId ? { ...s, percentage: 100 } : s
         );
     
@@ -703,8 +708,9 @@ const handleComplete = async () => {
       return;
     }
     
+    // Handle Conclusion
     if (isConclusion) {
-      const updatedSections = allSections.map(s => 
+      updatedSections = allSections.map(s => 
         s.id === sectionId ? { ...s, percentage: completenessAnalysis.isComplete ? 100 : 50 } : s
       );
     
@@ -734,119 +740,121 @@ const handleComplete = async () => {
       return;
     }
 
-    // Handle introduction
-    if (isIntroduction && !completenessAnalysis.isComplete) {
-      // Save requirements first
-      localStorage.setItem(`sectionRequirements_${sectionId}`, JSON.stringify({
-        missing: completenessAnalysis.completionStatus.missing,
-        improvements: completenessAnalysis.suggestedImprovements
-      }));
-    
-      setCompletionRequirements({
-        missing: completenessAnalysis.completionStatus.missing,
-        improvements: completenessAnalysis.suggestedImprovements,
-        isRevision: isRevisionAttempt,
-        hasBodyParagraphs: hasExistingBodyParagraphs,
-        isComplete: false,
-        onAddBodyParagraph: () => {
-          const conclusionIndex = allSections.findIndex(s => 
-            s.title.toLowerCase().includes('conclusion')
-          );
-        
-          const bodyParagraphs = allSections
-            .filter(s => s.title.toLowerCase().includes('body paragraph'))
-            .sort((a, b) => {
-              const numA = parseInt(a.title.match(/\d+/)[0]);
-              const numB = parseInt(b.title.match(/\d+/)[0]);
-              return numA - numB;
-            });
-        
-          const newBodySection = {
-            id: `body-${Date.now()}`,
-            title: `Body Paragraph ${bodyParagraphs.length + 1}`,
-            type: 'body',
-            percentage: 0
-          };
-        
-          let newUpdatedSections;
-          if (conclusionIndex !== -1) {
-            newUpdatedSections = [
-              ...allSections.slice(0, conclusionIndex),
-              newBodySection,
-              ...allSections.slice(conclusionIndex)
-            ];
-          } else {
-            newUpdatedSections = [...allSections, newBodySection];
-          }
-        
-          setShowRequirementsModal(false);
-          navigate(`/essayblock/${newBodySection.id}`, {
-            state: {
-              section: newBodySection,
-              allSections: newUpdatedSections,
-              essayInfo
-            }
-          });
-        }
-      });
+    // Handle Introduction
+    if (isIntroduction) {
+      if (!completenessAnalysis.isComplete) {
+        // Save requirements first
+        localStorage.setItem(`sectionRequirements_${sectionId}`, JSON.stringify({
+          missing: completenessAnalysis.completionStatus.missing,
+          improvements: completenessAnalysis.suggestedImprovements
+        }));
       
-      setShowRequirementsModal(true);
-      setIsCompleting(false);
-      return;
-    }
-
-    // Handle complete introduction with existing body paragraphs
-    if (isIntroduction && completenessAnalysis.isComplete && existingBodyParagraphs.length > 0) {
-      localStorage.removeItem(`sectionRequirements_${sectionId}`);
-      const updatedSections = allSections.map(s => 
-        s.id === sectionId ? { ...s, percentage: 100 } : s
-      );
-
-      setCompletionRequirements({
-        isComplete: true,
-        hasBodyParagraphs: true,
-        onKeepExisting: () => {
-          setShowRequirementsModal(false);
-          navigate(`/essayblock/${existingBodyParagraphs[0].id}`, {
-            state: {
-              section: existingBodyParagraphs[0],
-              allSections: updatedSections,
-              essayInfo
-            }
-          });
-        },
-        onRegenerateBodyParagraphs: async () => {
-          try {
-            const thesisPoints = await parseThesisPoints(essayContent);
-            const newBodySections = await generateBodySections(thesisPoints.mainPoints);
-            const filteredSections = updatedSections.filter(s => 
-              !s.title.toLowerCase().includes('body paragraph')
+        setCompletionRequirements({
+          missing: completenessAnalysis.completionStatus.missing,
+          improvements: completenessAnalysis.suggestedImprovements,
+          isRevision: isRevisionAttempt,
+          hasBodyParagraphs: hasExistingBodyParagraphs,
+          isComplete: false,
+          onAddBodyParagraph: () => {
+            const conclusionIndex = allSections.findIndex(s => 
+              s.title.toLowerCase().includes('conclusion')
             );
-            const afterIntroIndex = filteredSections.findIndex(s => 
-              s.title.toLowerCase().includes('introduction')
-            ) + 1;
-            const finalSections = [
-              ...filteredSections.slice(0, afterIntroIndex),
-              ...newBodySections,
-              ...filteredSections.slice(afterIntroIndex)
-            ];
+          
+            const bodyParagraphs = allSections
+              .filter(s => s.title.toLowerCase().includes('body paragraph'))
+              .sort((a, b) => {
+                const numA = parseInt(a.title.match(/\d+/)[0]);
+                const numB = parseInt(b.title.match(/\d+/)[0]);
+                return numA - numB;
+              });
+          
+            const newBodySection = {
+              id: `body-${Date.now()}-${bodyParagraphs.length + 1}`,
+              title: `Body Paragraph ${bodyParagraphs.length + 1}`,
+              type: 'body',
+              percentage: 0
+            };
+          
+            let newUpdatedSections;
+            if (conclusionIndex !== -1) {
+              newUpdatedSections = [
+                ...allSections.slice(0, conclusionIndex),
+                newBodySection,
+                ...allSections.slice(conclusionIndex)
+              ];
+            } else {
+              newUpdatedSections = [...allSections, newBodySection];
+            }
+          
             setShowRequirementsModal(false);
-            navigate(`/essayblock/${newBodySections[0].id}`, {
+            navigate(`/essayblock/${newBodySection.id}`, {
               state: {
-                section: newBodySections[0],
-                allSections: finalSections,
+                section: newBodySection,
+                allSections: newUpdatedSections,
                 essayInfo
               }
             });
-          } catch (error) {
-            console.error('Error generating new body sections:', error);
-            alert('Failed to generate new body paragraphs. Please try again.');
           }
-        }
-      });
-      setShowRequirementsModal(true);
-      setIsCompleting(false);
-      return;
+        });
+        
+        setShowRequirementsModal(true);
+        setIsCompleting(false);
+        return;
+      }
+
+      // Handle complete introduction with existing body paragraphs
+      if (completenessAnalysis.isComplete && existingBodyParagraphs.length > 0) {
+        localStorage.removeItem(`sectionRequirements_${sectionId}`);
+        updatedSections = allSections.map(s => 
+          s.id === sectionId ? { ...s, percentage: 100 } : s
+        );
+
+        setCompletionRequirements({
+          isComplete: true,
+          hasBodyParagraphs: true,
+          onKeepExisting: () => {
+            setShowRequirementsModal(false);
+            navigate(`/essayblock/${existingBodyParagraphs[0].id}`, {
+              state: {
+                section: existingBodyParagraphs[0],
+                allSections: updatedSections,
+                essayInfo
+              }
+            });
+          },
+          onRegenerateBodyParagraphs: async () => {
+            try {
+              const thesisPoints = await parseThesisPoints(essayContent);
+              const newBodySections = await generateBodySections(thesisPoints.mainPoints);
+              const filteredSections = updatedSections.filter(s => 
+                !s.title.toLowerCase().includes('body paragraph')
+              );
+              const afterIntroIndex = filteredSections.findIndex(s => 
+                s.title.toLowerCase().includes('introduction')
+              ) + 1;
+              const finalSections = [
+                ...filteredSections.slice(0, afterIntroIndex),
+                ...newBodySections,
+                ...filteredSections.slice(afterIntroIndex)
+              ];
+              setShowRequirementsModal(false);
+              navigate(`/essayblock/${newBodySections[0].id}`, {
+                state: {
+                  section: newBodySections[0],
+                  allSections: finalSections,
+                  essayInfo
+                }
+              });
+            } catch (error) {
+              console.error('Error generating new body sections:', error);
+              alert('Failed to generate new body paragraphs. Please try again.');
+            }
+          }
+        });
+        setShowRequirementsModal(true);
+        setIsCompleting(false);
+        return;
+      }
     }
   } catch (error) {
     console.error('Error during completion:', error);

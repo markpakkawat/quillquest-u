@@ -1,23 +1,23 @@
 // backend/routes/users.js
-
 const express = require('express');
 const router = express.Router();
-const { getProfile, updateProfile, getUserProfileById } = require('../controllers/userController');
+const { 
+  getProfile, 
+  updateProfile, 
+  getUserProfileById,
+  getMonthlyStats  // Add this new controller
+} = require('../controllers/userController');
 const { protect } = require('../middlewares/authMiddleware');
 
-// @route   GET /api/users/profile
-// @desc    Get current user's profile
-// @access  Private
+// Existing routes
 router.get('/profile', protect, getProfile);
-
-// @route   PUT /api/users/profile
-// @desc    Update current user's profile
-// @access  Private
 router.put('/profile', protect, updateProfile);
-
-// @route   GET /api/users/:userId/profile
-// @desc    Get a user's profile by ID
-// @access  Private
 router.get('/:userId/profile', protect, getUserProfileById);
+
+// New statistics route
+// @route   GET /api/users/monthly-stats
+// @desc    Get user's monthly writing statistics
+// @access  Private
+router.get('/monthly-stats', protect, getMonthlyStats);
 
 module.exports = router;

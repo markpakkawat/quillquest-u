@@ -1,7 +1,6 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
-
 // Load environment variables
 dotenv.config();
 
@@ -12,6 +11,9 @@ const allowedOrigins = [
   process.env.FRONTEND_URL,  // Vercel frontend
   'http://localhost:3000'    // Local development
 ];
+
+const statisticsRoutes = require('./routes/statistics');
+app.use('/api/statistics', statisticsRoutes);
 
 // CORS Middleware
 app.use(cors({
@@ -55,6 +57,7 @@ app.use('/api/comments', commentRoutes);
 app.use('/api/prompts', promptRoutes);
 app.use('/api', replyRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/statistics', statisticsRoutes);
 
 // Test Route
 app.get('/api/test', (req, res) => {

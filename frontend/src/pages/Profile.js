@@ -4,6 +4,8 @@ import Navbar from '../components/Navbar';
 import api from '../services/api';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { Link } from 'react-router-dom';
+import UserStatistics from '../components/UserStatistics';
+import MonthlyProgressReport from '../components/MonthlyProgressReport';
 
 const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
@@ -17,6 +19,39 @@ const Profile = () => {
   const [avgWordCount, setAvgWordCount] = useState(0); // State to hold the average word count per post
   const [hasChanges, setHasChanges] = useState(false); // State to track if there are changes
   const [userPosts, setUserPosts] = useState([]); // State to hold user's posts
+  // In Profile.js, add this state with the existing state declarations
+  const [monthlyStats, setMonthlyStats] = useState(null);
+  const [statsError, setStatsError] = useState(null);
+
+  const fetchMonthlyStats = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await api.get('/users/monthly-stats', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      setMonthlyStats(response.data);
+      setStatsError(null);
+    } catch (err) {
+      console.error('Error fetching monthly stats:', err);
+      // Don't set error for 404 - it's expected for new users
+      if (err.response?.status !== 404) {
+        setStatsError('Failed to load statistics');
+      }
+      // Set default stats for new users or error cases
+      setMonthlyStats({
+        qualityTrends: [],
+        improvements: [],
+        focusAreas: [],
+        overallProgress: {
+          errorReduction: 0,
+          clarityImprovement: 0,
+          activeVoiceIncrease: 0
+        }
+      });
+    }
+  };
 
   const handleSave = async () => {
     try {
@@ -211,20 +246,8 @@ const Profile = () => {
             </div>
           </div>
         </div>
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white p-4 rounded-lg shadow text-center">
-            <div className="text-4xl font-bold text-purple-600">{postsCount}</div>
-            <div className="text-sm text-gray-600">Essay Shared</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow text-center">
-            <div className="text-4xl font-bold text-purple-600">{totalLikes}</div>
-            <div className="text-sm text-gray-600">Total Likes</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow text-center">
-            <div className="text-4xl font-bold text-purple-600">{avgWordCount}</div>
-            <div className="text-sm text-gray-600">AVG. Word Count/Essay</div>
-          </div>
-        </div>
+        <UserStatistics />
+        <MonthlyProgressReport monthlyStats={monthlyStats} />
         <div className="mt-8">
           <h3 className="text-2xl font-semibold mb-4">All Posts</h3>
           {userPosts.length > 0 ? (
