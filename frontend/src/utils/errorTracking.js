@@ -16,11 +16,12 @@ export const SECTION_TYPES = {
 
 // In errorTracking.js, add this new endpoint to your ENDPOINTS object:
 const ENDPOINTS = {
-  errors: '/statistics/errors',
-  completeness: '/statistics/completeness',
-  userStats: '/statistics/monthly',
-  writingAnalysis: '/statistics/analysis'  // Remove the template literal
+  errors: '/statistics/errors',            // Remove /api prefix
+  completeness: '/statistics/completeness', // Remove /api prefix
+  userStats: '/statistics/monthly',         // Remove /api prefix
+  writingAnalysis: '/statistics/analysis'   // Remove /api prefix
 };
+
 
 // Update the saveWritingAnalysis function
 export const saveWritingAnalysis = async (sectionId, analysisData) => {
@@ -46,66 +47,82 @@ export const getWritingAnalysis = async (sectionId) => {
   try {
     let endpoint;
     if (sectionId === 'conclusion') {
-      endpoint = '/statistics/analysis/conclusion';
+      endpoint = '/statistics/analysis/conclusion';  // Remove /api prefix
     } else if (sectionId.startsWith('body-')) {
-      endpoint = `/statistics/analysis/${sectionId}`;
+      endpoint = `/statistics/analysis/${sectionId}`; // Remove /api prefix
     } else {
-      endpoint = `/statistics/analysis/${sectionId}`;
+      endpoint = `/statistics/analysis/${sectionId}`; // Remove /api prefix
     }
 
     try {
-      // Try API first
+      // Add debugging log
+      console.log('Making API request to:', endpoint);
+      
       const response = await api.get(endpoint);
       return response.data;
     } catch (apiError) {
-      console.warn('Failed to get writing analysis from API, falling back to localStorage');
+      console.warn('Writing analysis API error:', {
+        endpoint,
+        error: apiError.message,
+        status: apiError.response?.status,
+        data: apiError.response?.data
+      });
+
       // Fallback to localStorage
+      console.log('Falling back to localStorage');
       const data = localStorage.getItem(`writingAnalysis_${sectionId}`);
       if (data) {
-        return JSON.parse(data);
+        try {
+          return JSON.parse(data);
+        } catch (parseError) {
+          console.error('Error parsing localStorage data:', parseError);
+        }
       }
 
-      // If no data in localStorage, return default structure
-      return {
-        tone: {
-          type: "Analyzing...",
-          confidence: 0,
-          characteristics: []
-        },
-        voice: {
-          type: "Mixed",
-          activeVoicePercentage: 0,
-          passiveVoiceInstances: 0
-        },
-        clarity: {
-          score: 0,
-          level: "Analyzing...",
-          strengths: [],
-          improvements: []
-        },
-        complexity: {
-          sentenceStructure: {
-            score: 0,
-            averageLength: 0,
-            varietyScore: 0
-          },
-          wordChoice: {
-            complexWordsPercentage: 0,
-            academicVocabularyScore: 0
-          },
-          paragraphCohesion: {
-            score: 0,
-            transitionStrength: "Analyzing...",
-            logicalFlowScore: 0
-          }
-        }
-      };
+      console.log('Using default writing style');
+      return getDefaultWritingStyle();
     }
   } catch (error) {
-    console.error('Error getting writing analysis:', error);
-    return null;
+    console.error('Error in getWritingAnalysis:', error);
+    return getDefaultWritingStyle();
   }
 };
+
+// Separate the default style into its own function
+const getDefaultWritingStyle = () => ({
+  tone: {
+    type: "Analyzing...",
+    confidence: 0,
+    characteristics: []
+  },
+  voice: {
+    type: "Mixed",
+    activeVoicePercentage: 0,
+    passiveVoiceInstances: 0
+  },
+  clarity: {
+    score: 0,
+    level: "Analyzing...",
+    strengths: [],
+    improvements: []
+  },
+  complexity: {
+    sentenceStructure: {
+      score: 0,
+      averageLength: 0,
+      varietyScore: 0
+    },
+    wordChoice: {
+      complexWordsPercentage: 0,
+      academicVocabularyScore: 0
+    },
+    paragraphCohesion: {
+      score: 0,
+      transitionStrength: "Analyzing...",
+      logicalFlowScore: 0
+    }
+  }
+});
 
 const saveToLocalStorage = (key, data) => {
   try {

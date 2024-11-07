@@ -12,6 +12,7 @@ router.get('/writing-stats', protect, statisticsController.getWritingStats);
 router.get('/analysis/conclusion', protect, statisticsController.getConclusionAnalysis);
 router.get('/analysis/body-:timestamp', protect, statisticsController.getBodyAnalysis);
 router.get('/analysis/:sectionId', protect, statisticsController.getWritingAnalysis);
+router.get('/analysis/test', protect, statisticsController.testAnalysisEndpoint);
 
 // Statistics saving routes
 router.post('/errors', protect, statisticsController.saveErrorStats);
