@@ -1,8 +1,9 @@
+// backend/routes/posts.js
+
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middlewares/authMiddleware');
 const {
-  // Existing controllers
   createPost,
   getPosts,
   getPostById,
@@ -10,64 +11,47 @@ const {
   deletePost,
   likePost,
   unlikePost,
-  getUserPosts,
-  
-  // New statistics controllers
-  getPostStats,
-  updatePostStats
+  getUserPosts
 } = require('../controllers/postController');
 
-// Basic Post Routes
-//@desc    Get all posts by a specific user
-//@route   GET /api/posts/user
-//@access  Private
+// @route   GET /api/posts/user
+// @desc    Get all posts by a specific user
+// @access  Private
 router.get('/user', protect, getUserPosts);
 
-//@desc    Create a new post
-//@route   POST /api/posts
-//@access  Private
+// @route   POST /api/posts
+// @desc    Create a new post
+// @access  Private
 router.post('/', protect, createPost);
 
-//@desc    Get all posts
-//@route   GET /api/posts
-//@access  Public
+// @route   GET /api/posts
+// @desc    Get all posts
+// @access  Public
 router.get('/', getPosts);
 
-//@desc    Get post by ID
-//@route   GET /api/posts/:id
-//@access  Public
+// @route   GET /api/posts/:id
+// @desc    Get post by ID
+// @access  Public
 router.get('/:id', getPostById);
 
-//@desc    Update a post
-//@route   PUT /api/posts/:id
-//@access  Private
+// @route   PUT /api/posts/:id
+// @desc    Update a post
+// @access  Private
 router.put('/:id', protect, updatePost);
 
-//@desc    Delete a post
-//@route   DELETE /api/posts/:id
-//@access  Private
+// @route   DELETE /api/posts/:id
+// @desc    Delete a post
+// @access  Private
 router.delete('/:id', protect, deletePost);
 
-// Like/Unlike Routes
-//@desc    Like a post
-//@route   PUT /api/posts/:id/like
-//@access  Private
+// @route   PUT /api/posts/:id/like
+// @desc    Like a post
+// @access  Private
 router.put('/:id/like', protect, likePost);
 
-//@desc    Unlike a post
-//@route   PUT /api/posts/:id/unlike
-//@access  Private
+// @route   PUT /api/posts/:id/unlike
+// @desc    Unlike a post
+// @access  Private
 router.put('/:id/unlike', protect, unlikePost);
-
-// Statistics Routes
-//@desc    Get statistics for a specific post
-//@route   GET /api/posts/:id/stats
-//@access  Private
-router.get('/:id/stats', protect, getPostStats);
-
-//@desc    Update statistics for a specific post
-//@route   PUT /api/posts/:id/stats
-//@access  Private
-router.put('/:id/stats', protect, updatePostStats);
 
 module.exports = router;

@@ -1,57 +1,21 @@
-// routes/statistics.js
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middlewares/authMiddleware');
-const Post = require('../models/Post');
+const statisticsController = require('../controllers/statisticsController');
 
-// Get monthly statistics
-router.get('/monthly', protect, async (req, res) => {
-  try {
-    const threeMonthsAgo = new Date();
-    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+// Main routes
+router.get('/errors', protect, statisticsController.getErrorStats);
+router.get('/monthly', protect, statisticsController.getMonthlyStats);
+router.get('/writing-stats', protect, statisticsController.getWritingStats);
 
-    // Get posts with their stored statistics
-    const posts = await Post.find({
-      userId: req.user.id,
-      createdAt: { $gte: threeMonthsAgo }
-    }).sort({ createdAt: 1 })
-    .select('statistics createdAt content'); // Only select needed fields
+// Analysis routes
+router.get('/analysis/conclusion', protect, statisticsController.getConclusionAnalysis);
+router.get('/analysis/body-:timestamp', protect, statisticsController.getBodyAnalysis);
+router.get('/analysis/:sectionId', protect, statisticsController.getWritingAnalysis);
 
-    // For new users with no posts
-    if (!posts.length) {
-      return res.json({
-        qualityTrends: [],
-        improvements: [],
-        focusAreas: [],
-        overallProgress: {
-          errorReduction: 0,
-          clarityImprovement: 0
-        }
-      });
-    }
-
-    // Use the actual statistics stored in posts
-    const monthlyStats = {
-      qualityTrends: posts.map(post => ({
-        date: post.createdAt,
-        errors: post.statistics?.overall?.totalErrors || 0,
-        clarity: post.statistics?.writingMetrics?.clarity?.score || 0,
-        completeness: post.statistics?.overall?.requirementsMet / 
-                     post.statistics?.overall?.requirementsTotal * 100 || 0
-      })),
-      improvements: posts[posts.length - 1].statistics?.improvements || [],
-      focusAreas: posts[posts.length - 1].statistics?.commonMissingRequirements || [],
-      overallProgress: posts[posts.length - 1].statistics?.overallProgress || {
-        errorReduction: 0,
-        clarityImprovement: 0
-      }
-    };
-
-    res.json(monthlyStats);
-  } catch (err) {
-    console.error('Error fetching statistics:', err);
-    res.status(500).send('Server Error');
-  }
-});
+// Statistics saving routes
+router.post('/errors', protect, statisticsController.saveErrorStats);
+router.post('/completeness', protect, statisticsController.saveCompletenessStats);
+router.post('/analysis/:sectionId', protect, statisticsController.saveWritingAnalysis);
 
 module.exports = router;

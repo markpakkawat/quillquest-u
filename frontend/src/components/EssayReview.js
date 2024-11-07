@@ -8,7 +8,6 @@ import {
   XIcon
 } from '@heroicons/react/solid';
 import { AuthContext } from '../context/AuthContext';
-import WritingAssistant from '../components/WritingAssistant';
 import EssayReviewStats from './EssayReviewStats';
 import api from '../services/api';
 
@@ -19,35 +18,37 @@ export const EssayReview = () => {
   const { allSections, essayInfo } = location.state || {};
   
   const [isPosting, setIsPosting] = useState(false);
-  const [showWritingAssistant, setShowWritingAssistant] = useState(false);
-  const [previousEssays, setPreviousEssays] = useState([]);
   const [showStats, setShowStats] = useState(true);
   const [postingError, setPostingError] = useState(null);
-  const [loadingPrevious, setLoadingPrevious] = useState(true);
+  const [loadingStats, setLoadingStats] = useState(true);
+  
 
   const fullEssayContent = allSections
     ?.map(section => localStorage.getItem(`essayContent_${section.id}`))
     .filter(Boolean)
     .join('\n\n');
 
-  useEffect(() => {
-    const fetchPreviousEssays = async () => {
-      try {
-        const response = await api.get('/posts/user');
-        // Get last 5 essays excluding the current one
-        const essays = response.data
-          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-          .slice(0, 5);
-        setPreviousEssays(essays);
-      } catch (error) {
-        console.error('Error fetching previous essays:', error);
-      } finally {
-        setLoadingPrevious(false);
-      }
-    };
-
-    fetchPreviousEssays();
-  }, []);
+    useEffect(() => {
+      const loadStoredStats = () => {
+        try {
+          // Check if all sections have writing style analysis
+          const hasAllStats = allSections?.every(section => 
+            localStorage.getItem(`writingStyle_${section.id}`)
+          );
+          
+          if (!hasAllStats) {
+            console.warn('Some sections missing writing analysis');
+          }
+          
+          setLoadingStats(false);
+        } catch (error) {
+          console.error('Error loading writing stats:', error);
+          setLoadingStats(false);
+        }
+      };
+    
+      loadStoredStats();
+    }, [allSections]);
 
   const handlePost = async () => {
     if (!auth?.token) {
@@ -162,12 +163,6 @@ export const EssayReview = () => {
               <ChartBarIcon className="h-6 w-6" />
             </button>
             <button
-              onClick={() => setShowWritingAssistant(true)}
-              className="text-gray-600 hover:text-purple-600 transition-colors p-2"
-            >
-              <ChatAlt2Icon className="h-6 w-6" />
-            </button>
-            <button
               onClick={handlePost}
               disabled={isPosting}
               className="bg-green-600 text-white px-6 py-2 rounded-full flex items-center space-x-2 
@@ -209,9 +204,8 @@ export const EssayReview = () => {
               <div className="p-6">
                 <h2 className="text-lg font-semibold mb-6">Essay Analysis</h2>
                 <EssayReviewStats 
-                  currentContent={fullEssayContent}
-                  previousEssays={previousEssays}
-                  loading={loadingPrevious}
+                  sections={allSections}
+                  loading={loadingStats}
                 />
               </div>
             </div>

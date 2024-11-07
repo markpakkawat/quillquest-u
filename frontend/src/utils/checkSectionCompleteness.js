@@ -31,7 +31,7 @@ export const parseThesisPoints = async (thesisContent) => {
     apiKey: process.env.REACT_APP_GROQ_API_KEY,
     model: "llama3-70b-8192",
     temperature: 0,
-    maxTokens: 1024,
+    maxTokens: 2048,
   });
 
   const systemMessage = {

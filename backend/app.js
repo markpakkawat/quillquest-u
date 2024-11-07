@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+
 // Load environment variables
 dotenv.config();
 
@@ -12,10 +13,8 @@ const allowedOrigins = [
   'http://localhost:3000'    // Local development
 ];
 
-const statisticsRoutes = require('./routes/statistics');
-app.use('/api/statistics', statisticsRoutes);
-
-// CORS Middleware
+// 1. First, apply critical middleware
+// CORS Middleware must come before routes
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or Postman)
@@ -25,21 +24,33 @@ app.use(cors({
       callback(new Error(`CORS Error: Origin ${origin} not allowed`));
     }
   },
-  credentials: true,  // Allows credentials like cookies or authorization headers
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],  // Allowed HTTP methods
-  allowedHeaders: ['Content-Type', 'Authorization'],  // Allowed headers
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  maxAge: 600 // Increase preflight cache time to 10 minutes
 }));
 
-// Middleware to parse JSON requests
+// 2. Body parsing middleware
 app.use(express.json());
 
-// Request Logging Middleware
+// 3. Request Logging Middleware
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
   next();
 });
 
-// Import Routes
+// 4. Handle Preflight Requests (OPTIONS)
+app.options('*', (req, res) => {
+  // Set CORS headers explicitly for OPTIONS requests
+  res.header('Access-Control-Allow-Origin', req.headers.origin);
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, X-Requested-With');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.status(204).send();
+});
+
+// 5. Import Routes
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const postRoutes = require('./routes/posts');
@@ -48,8 +59,9 @@ const promptRoutes = require('./routes/prompts');
 const replyRoutes = require('./routes/replies');
 const notificationRoutes = require('./routes/notifications');
 const resetPasswordRoute = require('./routes/resetPassword');
+const statisticsRoutes = require('./routes/statistics');
 
-// Routes
+// 6. Apply Routes
 app.use('/api/auth', authRoutes, resetPasswordRoute);
 app.use('/api/users', userRoutes);
 app.use('/api/posts', postRoutes);
@@ -59,28 +71,32 @@ app.use('/api', replyRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/statistics', statisticsRoutes);
 
-// Test Route
+// 7. Test Route
 app.get('/api/test', (req, res) => {
   res.json({ message: 'Test route working' });
 });
 
-// Handle Preflight Requests (OPTIONS)
-app.options('*', (req, res) => {
-  res.header('Access-Control-Allow-Origin', req.headers.origin);
-  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
-  res.send();
-});
-
-// Error Handling Middleware
+// 8. Error Handling Middleware (should be last)
 app.use((err, req, res, next) => {
+  // Log error details
   console.error('Global error handler:', {
     error: err.message,
     stack: err.stack,
     path: req.path,
     method: req.method,
+    origin: req.headers.origin
   });
 
+  // Handle CORS errors specifically
+  if (err.message && err.message.startsWith('CORS Error:')) {
+    return res.status(403).json({
+      message: 'CORS Error',
+      error: err.message,
+      allowedOrigins: process.env.NODE_ENV === 'production' ? [] : allowedOrigins
+    });
+  }
+
+  // Handle other errors
   res.status(500).json({
     message: 'Server Error',
     error: err.message,

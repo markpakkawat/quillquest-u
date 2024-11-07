@@ -9,9 +9,6 @@ const fs = require('fs');
 const path = require('path');
 const { generatePrompt } = require('./utils/promptGenerator');
 
-const statisticsRoutes = require('./routes/statistics');
-app.use('/api/statistics', statisticsRoutes);
-
 // Enhanced logging function
 const logWithTimestamp = (message) => {
   console.log(`[${new Date().toISOString()}] ${message}`);

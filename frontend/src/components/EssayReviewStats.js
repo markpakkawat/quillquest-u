@@ -8,7 +8,7 @@ import {
   Type, Layout, TrendingUp, TrendingDown,
   AlertCircle 
 } from "lucide-react";
-import { analyzeWritingStyle } from '../utils/writing/writingAnalysis';
+import { getWritingAnalysis } from '../utils/errorTracking';
 
 const calculateImprovements = (currentStats, previousStats) => {
   if (!previousStats) return null;
@@ -58,38 +58,44 @@ const calculateImprovements = (currentStats, previousStats) => {
   };
 };
 
-const EssayReviewStats = ({ currentContent, previousEssays }) => {
+const EssayReviewStats = ( {sections} ) => {
   const [stats, setStats] = useState(null);
   const [comparisonStats, setComparisonStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const analyzeEssay = async () => {
+    const loadStats = async () => {
       try {
-        setLoading(true);
-        // Analyze current essay
-        const currentStats = await analyzeWritingStyle(currentContent);
-        
-        // Get stats from previous essays for comparison
-        const lastEssay = previousEssays[previousEssays.length - 1];
-        const prevStats = lastEssay ? await analyzeWritingStyle(lastEssay.content) : null;
-        
-        // Calculate improvements
-        const improvements = calculateImprovements(currentStats, prevStats);
-        
+        if (!sections || !Array.isArray(sections)) {
+          console.error('No sections array provided');
+          setLoading(false);
+          return;
+        }
+  
+        const currentSection = sections[sections.length - 1];
+        const previousSection = sections[sections.length - 2];
+  
+        // Use await with getWritingAnalysis since it's now async
+        const [currentStats, previousStats] = await Promise.all([
+          currentSection ? getWritingAnalysis(currentSection.id) : null,
+          previousSection ? getWritingAnalysis(previousSection.id) : null
+        ]);
+  
         setStats(currentStats);
-        setComparisonStats(improvements);
+        setComparisonStats(
+          currentStats && previousStats 
+            ? calculateImprovements(currentStats, previousStats)
+            : null
+        );
       } catch (error) {
-        console.error('Error analyzing essay:', error);
+        console.error('Error loading essay review stats:', error);
       } finally {
         setLoading(false);
       }
     };
-
-    if (currentContent) {
-      analyzeEssay();
-    }
-  }, [currentContent, previousEssays]);
+  
+    loadStats();
+}, [sections]);
 
   if (loading) {
     return (

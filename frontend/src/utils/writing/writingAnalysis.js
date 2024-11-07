@@ -1,16 +1,50 @@
 import { ChatGroq } from "@langchain/groq";
 
-export const analyzeWritingStyle = async (text) => {
-  const llm = new ChatGroq({
-    apiKey: process.env.REACT_APP_GROQ_API_KEY,
-    model: "llama3-70b-8192",
-    temperature: 0,
-    maxTokens: 1024,
-  });
+// Rate limiting configuration
+const RATE_LIMIT = {
+  maxRequests: 5, // Maximum requests per window
+  windowMs: 10000, // Time window in milliseconds (10 seconds)
+  requests: [],    // Track request timestamps
+  retryDelay: 1000 // Base delay for retries (1 second)
+};
 
-  const systemMessage = {
-    role: 'system',
-    content: `Analyze the writing style of the given text and return ONLY a JSON object with the following structure:
+// Delay helper
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+// Add exponential backoff for retries
+const getRetryDelay = (attempt) => {
+  return Math.min(RATE_LIMIT.retryDelay * Math.pow(2, attempt), 32000); // Max 32 seconds
+};
+
+export const analyzeWritingStyle = async (text, attempt = 0) => {
+  try {
+    // Remove old requests outside the window
+    const now = Date.now();
+    RATE_LIMIT.requests = RATE_LIMIT.requests.filter(
+      time => now - time < RATE_LIMIT.windowMs
+    );
+
+    // Check if we're within rate limits
+    if (RATE_LIMIT.requests.length >= RATE_LIMIT.maxRequests) {
+      const waitTime = getRetryDelay(attempt);
+      console.log(`Rate limit reached, waiting ${waitTime}ms before retry`);
+      await delay(waitTime);
+      return analyzeWritingStyle(text, attempt + 1);
+    }
+
+    // Track this request
+    RATE_LIMIT.requests.push(now);
+
+    const llm = new ChatGroq({
+      apiKey: process.env.REACT_APP_GROQ_API_KEY,
+      model: "llama3-70b-8192",
+      temperature: 0,
+      maxTokens: 1024,
+    });
+
+    const systemMessage = {
+      role: 'system',
+      content: `Analyze the writing style of the given text and return ONLY a JSON object with the following structure:
 {
   "tone": {
     "type": "Formal|Informal|Neutral",
@@ -20,8 +54,7 @@ export const analyzeWritingStyle = async (text) => {
   "voice": {
     "type": "Active|Passive|Mixed",
     "activeVoicePercentage": number (0-100),
-    "passiveVoiceInstances": number,
-    "suggestions": ["suggestion1", "suggestion2"]
+    "passiveVoiceInstances": number
   },
   "clarity": {
     "score": number (0-100),
@@ -37,8 +70,7 @@ export const analyzeWritingStyle = async (text) => {
     },
     "wordChoice": {
       "complexWordsPercentage": number (0-100),
-      "academicVocabularyScore": number (0-100),
-      "uniqueWordsRatio": number (0-100)
+      "academicVocabularyScore": number (0-100)
     },
     "paragraphCohesion": {
       "score": number (0-100),
@@ -47,9 +79,8 @@ export const analyzeWritingStyle = async (text) => {
     }
   }
 }`
-  };
+    };
 
-  try {
     const response = await llm.invoke([
       systemMessage,
       { role: 'user', content: `Analyze this text: "${text}"` }
@@ -61,11 +92,18 @@ export const analyzeWritingStyle = async (text) => {
     }
 
     return JSON.parse(jsonStr);
+
   } catch (error) {
-    console.error('Error analyzing writing style:', error);
-    return null;
+    if (error.response?.status === 429) {
+      const waitTime = getRetryDelay(attempt);
+      console.warn(`Groq API rate limit reached. Retrying in ${waitTime}ms...`);
+      await delay(waitTime);
+      return analyzeWritingStyle(text, attempt + 1);
+    }
+    throw error;
   }
 };
+
 
 // Helper functions for aggregating style analyses
 export const aggregateStyleAnalyses = (analyses) => {

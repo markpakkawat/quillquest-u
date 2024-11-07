@@ -1,61 +1,51 @@
-// models/Statistics.js
 const mongoose = require('mongoose');
+
+const ErrorStatSchema = new mongoose.Schema({
+  sectionId: {
+    type: String,
+    required: true
+  },
+  sectionType: {
+    type: String,
+    required: true
+  },
+  timestamp: {
+    type: Date,
+    default: Date.now
+  },
+  totalErrors: {
+    type: Number,
+    default: 0
+  },
+  errorsByCategory: {
+    type: Map,
+    of: Number,
+    default: () => new Map()
+  },
+  detailedErrors: [mongoose.Schema.Types.Mixed]
+}, { 
+  strict: false, // Allow flexible error data structure
+  _id: false     // Don't create _id for subdocuments
+});
 
 const StatisticsSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
     required: true
-  },
-  date: {
-    type: Date,
-    default: Date.now
   },
   essayId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Post',
     required: true
   },
+  errors: [ErrorStatSchema],
   writingMetrics: {
-    clarity: {
-      score: Number,
-      strengths: [String],
-      improvements: [String]
-    },
-    complexity: {
-      sentenceStructure: {
-        score: Number,
-        averageLength: Number
-      },
-      wordChoice: {
-        complexWordsPercentage: Number,
-        academicVocabularyScore: Number
-      },
-      paragraphCohesion: {
-        score: Number,
-        transitionStrength: String
-      }
-    },
-    tone: {
-      type: String,
-      characteristics: [String]
-    },
-    voice: {
-      activeVoicePercentage: Number,
-      passiveInstances: Number
-    }
-  },
-  errorMetrics: {
-    totalErrors: Number,
-    categorizedErrors: {
-      spelling: Number,
-      punctuation: Number,
-      lexicoSemantic: Number,
-      stylistic: Number,
-      typographical: Number
-    },
-    improvements: [String]
+    type: mongoose.Schema.Types.Mixed,
+    default: {}
   }
+}, {
+  timestamps: true
 });
+
+
 
 module.exports = mongoose.model('Statistics', StatisticsSchema);

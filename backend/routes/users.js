@@ -5,7 +5,8 @@ const {
   getProfile, 
   updateProfile, 
   getUserProfileById,
-  getMonthlyStats  // Add this new controller
+  getMonthlyStats,  // Add this new controller
+  getWritingStats
 } = require('../controllers/userController');
 const { protect } = require('../middlewares/authMiddleware');
 
@@ -19,5 +20,6 @@ router.get('/:userId/profile', protect, getUserProfileById);
 // @desc    Get user's monthly writing statistics
 // @access  Private
 router.get('/monthly-stats', protect, getMonthlyStats);
+router.get('/writing-stats', protect, getWritingStats);
 
 module.exports = router;
