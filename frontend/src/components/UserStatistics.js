@@ -92,55 +92,73 @@ const UserStatistics = ({ statistics, postsCount, avgWordCount, loading }) => {
 useEffect(() => {
   const loadStats = async () => {
     try {
+      // Use props data if available
+      if (statistics) {
+        setBasicStats({
+          postsCount: postsCount || 0,
+          averageWordCount: avgWordCount || 0,
+          completedEssays: statistics.completionStatus?.completedSections || 0,
+          completionRate: statistics.completionStatus?.completionRate || 0,
+          writingStyle: null, // Will be updated below
+          writingTime: getWritingTime()
+        });
+        setWritingStats(statistics);
+      }
+
+      // Get sections data
       const essaySections = JSON.parse(localStorage.getItem('essaySections') || '[]');
       if (!essaySections.length) {
-        setBasicStats(null);
-        setWritingStats(null);
+        if (!statistics) { // Only reset if we don't have props data
+          setBasicStats(null);
+          setWritingStats(null);
+        }
         return;
       }
 
       const currentSection = essaySections[essaySections.length - 1];
       
-      // Get writing analysis for the current section
+      // Get writing analysis for current section
       let writingStyle = null;
       if (currentSection) {
         try {
-          if (currentSection.type === 'conclusion') {
-            writingStyle = await getWritingAnalysis('conclusion');
-          } else if (currentSection.type === 'body') {
-            const timestamp = new Date(currentSection.createdAt).getTime();
-            writingStyle = await getWritingAnalysis(`body-${timestamp}`);
-          } else {
-            writingStyle = await getWritingAnalysis(currentSection.id);
-          }
+          const sectionId = currentSection.type === 'conclusion' 
+            ? 'conclusion' 
+            : currentSection.type === 'body' 
+              ? `body-${new Date(currentSection.createdAt).getTime()}`
+              : currentSection.id;
+              
+          writingStyle = await getWritingAnalysis(sectionId);
         } catch (error) {
           console.warn('Failed to get writing analysis:', error);
-          // Use default values if analysis fails
           writingStyle = getDefaultWritingStyle();
         }
       }
 
       // Get current word count
       const content = currentSection 
-        ? localStorage.getItem(`essayContent_${currentSection.id}`)
+        ? localStorage.getItem(`essayContent_${currentSection.id}`) || ''
         : '';
-      const wordCount = content
-        ? content.trim().split(/\s+/).filter(word => word.length > 0).length
-        : 0;
+      const wordCount = content.trim().split(/\s+/).filter(word => word.length > 0).length;
 
-      // Get stats from localStorage instead of API
-      const stats = await getWritingStats();
-
-      setBasicStats({
-        postsCount: essaySections.length,
-        averageWordCount: wordCount,
-        completedEssays: stats.completionStatus?.completedSections || 0,
-        completionRate: stats.completionStatus?.completionRate || 0,
-        writingStyle,
-        writingTime: getWritingTime()
-      });
-
-      setWritingStats(stats);
+      // If we don't have props data, get stats from localStorage
+      if (!statistics) {
+        const stats = await getWritingStats();
+        setBasicStats({
+          postsCount: essaySections.length,
+          averageWordCount: wordCount,
+          completedEssays: stats.completionStatus?.completedSections || 0,
+          completionRate: stats.completionStatus?.completionRate || 0,
+          writingStyle,
+          writingTime: getWritingTime()
+        });
+        setWritingStats(stats);
+      } else {
+        // If we have props data, just update the writingStyle
+        setBasicStats(prev => ({
+          ...prev,
+          writingStyle
+        }));
+      }
     } catch (error) {
       console.error('Error loading statistics:', error);
     }
@@ -149,7 +167,7 @@ useEffect(() => {
   loadStats();
   const interval = setInterval(loadStats, 1000);
   return () => clearInterval(interval);
-}, []);
+}, [statistics, postsCount, avgWordCount]);
 
 // Add this helper function
 const getDefaultWritingStyle = () => ({

@@ -33,20 +33,47 @@ const Profile = () => {
       const essaySections = JSON.parse(localStorage.getItem('essaySections') || '[]');
       const errorStats = JSON.parse(localStorage.getItem('errorStats') || '[]');
       const completenessStats = JSON.parse(localStorage.getItem('completenessStats') || '[]');
-
+  
       const token = localStorage.getItem('token');
       const response = await api.get('/users/writing-stats', {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-
+  
+      // Calculate current session stats
+      const currentSessionStats = {
+        essaySections,
+        errorStats,
+        completenessStats,
+        currentErrors: {},
+        totalErrors: 0,
+        errorTrends: [],
+        sectionRates: {},
+        commonMissingRequirements: [],
+        completionStatus: {
+          totalSections: essaySections.length,
+          completedSections: completenessStats.filter(stat => stat.isComplete).length,
+          completionRate: essaySections.length > 0 
+            ? Math.round((completenessStats.filter(stat => stat.isComplete).length / essaySections.length) * 100)
+            : 0
+        }
+      };
+  
+      // Calculate error stats if available
+      if (errorStats.length > 0) {
+        currentSessionStats.totalErrors = errorStats.reduce((sum, stat) => sum + (stat.totalErrors || 0), 0);
+        errorStats.forEach(stat => {
+          if (stat.errorsByCategory) {
+            Object.entries(stat.errorsByCategory).forEach(([category, count]) => {
+              currentSessionStats.currentErrors[category] = (currentSessionStats.currentErrors[category] || 0) + count;
+            });
+          }
+        });
+      }
+  
       setStatisticsData({
-        currentSession: {
-          essaySections,
-          errorStats,
-          completenessStats
-        },
+        currentSession: currentSessionStats,
         historical: response.data
       });
     } catch (error) {
@@ -55,7 +82,17 @@ const Profile = () => {
         currentSession: {
           essaySections: [],
           errorStats: [],
-          completenessStats: []
+          completenessStats: [],
+          currentErrors: {},
+          totalErrors: 0,
+          errorTrends: [],
+          sectionRates: {},
+          commonMissingRequirements: [],
+          completionStatus: {
+            totalSections: 0,
+            completedSections: 0,
+            completionRate: 0
+          }
         },
         historical: null
       });
@@ -266,7 +303,7 @@ const Profile = () => {
         </div>
         
         <UserStatistics 
-          statistics={statisticsData}
+          statistics={statisticsData.currentSession}
           postsCount={postsCount}
           avgWordCount={avgWordCount}
           loading={isLoading}
