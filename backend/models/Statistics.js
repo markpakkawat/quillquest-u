@@ -2,59 +2,57 @@
 const mongoose = require('mongoose');
 
 const StatisticsSchema = new mongoose.Schema({
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  date: {
-    type: Date,
-    default: Date.now
-  },
-  essayId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Post',
-    required: true
+  overall: {
+    wordCount: { type: Number, required: true },
+    sentenceCount: { type: Number, required: true },
+    paragraphCount: { type: Number, required: true },
+    averageWordsPerSentence: { type: Number, required: true },
+    totalErrors: { type: Number, default: 0 },
+    requirementsMet: { type: Number, required: true },
+    requirementsTotal: { type: Number, required: true }
   },
   writingMetrics: {
     clarity: {
-      score: Number,
+      score: { type: Number, required: true, min: 0, max: 100 },
       strengths: [String],
       improvements: [String]
     },
     complexity: {
       sentenceStructure: {
-        score: Number,
-        averageLength: Number
+        score: { type: Number, required: true, min: 0 },
+        averageLength: { type: Number, required: true }
       },
       wordChoice: {
-        complexWordsPercentage: Number,
-        academicVocabularyScore: Number
+        complexWordsPercentage: { type: Number, required: true },
+        academicVocabularyScore: { type: Number, default: 0 }
       },
       paragraphCohesion: {
-        score: Number,
-        transitionStrength: String
+        score: { type: Number, required: true },
+        transitionStrength: { 
+          type: String, 
+          enum: ['weak', 'moderate', 'strong'],
+          default: 'moderate'
+        }
       }
     },
     tone: {
-      type: String,
+      type: { 
+        type: String,
+        enum: ['formal', 'informal', 'neutral'],
+        default: 'neutral'
+      },
       characteristics: [String]
     },
     voice: {
-      activeVoicePercentage: Number,
-      passiveInstances: Number
+      activeVoicePercentage: { type: Number, default: 0 },
+      passiveInstances: { type: Number, default: 0 }
     }
   },
-  errorMetrics: {
-    totalErrors: Number,
-    categorizedErrors: {
-      spelling: Number,
-      punctuation: Number,
-      lexicoSemantic: Number,
-      stylistic: Number,
-      typographical: Number
-    },
-    improvements: [String]
+  improvements: [String],
+  commonMissingRequirements: [String],
+  overallProgress: {
+    errorReduction: { type: Number, default: 0 },
+    clarityImprovement: { type: Number, default: 0 }
   }
 });
 

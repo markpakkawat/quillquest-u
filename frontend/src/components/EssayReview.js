@@ -48,92 +48,149 @@ export const EssayReview = () => {
 
     fetchPreviousEssays();
   }, []);
+  
+// Update the handlePost function in EssayReview.js
+const handlePost = async () => {
+  if (!auth?.token) {
+    alert('Please log in to post your essay');
+    navigate('/login', { state: { from: location } });
+    return;
+  }
 
-  const handlePost = async () => {
-    if (!auth?.token) {
-      alert('Please log in to post your essay');
-      navigate('/login', { state: { from: location } });
-      return;
-    }
+  if (!fullEssayContent) {
+    setPostingError('Cannot post empty essay');
+    return;
+  }
 
-    if (!fullEssayContent) {
-      setPostingError('Cannot post empty essay');
-      return;
-    }
+  if (!essayInfo?.title || !essayInfo?.postType) {
+    setPostingError('Missing required essay information');
+    return;
+  }
 
-    if (!essayInfo?.title || !essayInfo?.postType) {
-      setPostingError('Missing required essay information');
-      return;
-    }
-
-    try {
-      setIsPosting(true);
-      setPostingError(null);
-      
-      const postData = {
-        title: essayInfo.title,
-        content: fullEssayContent,
-        postType: essayInfo.postType,
-        prompt: essayInfo.promptId || null,
-        sections: allSections.map(section => ({
-          title: section.title,
-          content: localStorage.getItem(`essayContent_${section.id}`) || '',
-          order: section.order
-        })),
-        statistics: {
-          wordCount: fullEssayContent.split(/\s+/).length,
-          completionTime: new Date() - new Date(essayInfo.startTime),
-          sectionStats: allSections.map(section => ({
-            sectionId: section.id,
-            errors: JSON.parse(localStorage.getItem(`sectionErrors_${section.id}`) || '[]'),
-            requirements: JSON.parse(localStorage.getItem(`sectionRequirements_${section.id}`) || '{}')
-          }))
+  try {
+    setIsPosting(true);
+    setPostingError(null);
+    
+    // Text analysis
+    const text = fullEssayContent.trim();
+    const words = text.split(/\s+/).filter(word => word.length > 0);
+    const sentences = text.split(/[.!?]+/).filter(sentence => sentence.trim().length > 0);
+    const paragraphs = text.split(/\n\s*\n/).filter(para => para.trim().length > 0);
+    
+    // Calculate required metrics
+    const avgWordLength = words.reduce((sum, word) => sum + word.length, 0) / words.length || 0;
+    const longWords = words.filter(word => word.length > 6).length;
+    const complexityScore = Math.min(Math.max(((longWords / words.length) * 100) || 0, 0), 100);
+    const avgWordsPerSentence = sentences.length > 0 ? words.length / sentences.length : 0;
+    
+    // Ensure all required fields are numbers and within valid ranges
+    const postData = {
+      title: essayInfo.title,
+      content: fullEssayContent,
+      postType: essayInfo.postType,
+      prompt: essayInfo.promptId || null,
+      statistics: {
+        overall: {
+          wordCount: words.length,
+          sentenceCount: sentences.length,
+          paragraphCount: paragraphs.length,
+          averageWordsPerSentence: parseFloat(avgWordsPerSentence.toFixed(2)),
+          totalErrors: 0,
+          requirementsMet: allSections?.filter(s => 
+            localStorage.getItem(`essayContent_${s.id}`)?.trim().length > 0).length || 0,
+          requirementsTotal: allSections?.length || 0
+        },
+        writingMetrics: {
+          clarity: {
+            score: parseFloat(complexityScore.toFixed(2)),
+            strengths: [],
+            improvements: []
+          },
+          complexity: {
+            sentenceStructure: {
+              score: parseFloat(avgWordLength.toFixed(2)),
+              averageLength: parseFloat(avgWordsPerSentence.toFixed(2))
+            },
+            wordChoice: {
+              complexWordsPercentage: parseFloat(((longWords / words.length) * 100).toFixed(2)),
+              academicVocabularyScore: 0
+            },
+            paragraphCohesion: {
+              score: parseFloat((words.length / Math.max(paragraphs.length, 1)).toFixed(2)),
+              transitionStrength: 'moderate'
+            }
+          },
+          tone: {
+            type: 'neutral',
+            characteristics: []
+          },
+          voice: {
+            activeVoicePercentage: 0,
+            passiveInstances: 0
+          }
+        },
+        improvements: [],
+        commonMissingRequirements: [],
+        overallProgress: {
+          errorReduction: 0,
+          clarityImprovement: 0
         }
-      };
-
-      const response = await api.post('/posts', postData);
-
-      if (response.data) {
-        // Clear ALL related data from localStorage
-        const keys = Object.keys(localStorage);
-        keys.forEach(key => {
-          if (
-            key.startsWith('essayContent_') ||
-            key.startsWith('sectionRequirements_') ||
-            key.startsWith('sectionErrors_') ||
-            key === 'essaySections' ||
-            key === 'essayInfo' ||
-            key.startsWith('essay_') ||
-            key.includes('section')
-          ) {
-            localStorage.removeItem(key);
-          }
-        });
-
-        // Navigate to success page
-        navigate('/home', { 
-          replace: true,
-          state: { 
-            message: 'Essay posted successfully!',
-            essayId: response.data._id
-          }
-        });
       }
-    } catch (error) {
-      if (error.response?.status === 401) {
-        setPostingError('Your session has expired. Please log in again.');
-        navigate('/login', { state: { from: location } });
-      } else if (error.response?.status === 400) {
-        setPostingError(error.response.data.message || 'Invalid essay data. Please check all fields.');
-      } else if (error.response?.status === 413) {
-        setPostingError('Essay content is too large. Please try shortening it.');
-      } else {
-        setPostingError('Failed to post essay. Please try again later.');
+    };
+
+    // Validate numbers before sending
+    const validateNumbers = (obj) => {
+      for (const key in obj) {
+        if (typeof obj[key] === 'object' && obj[key] !== null) {
+          validateNumbers(obj[key]);
+        } else if (typeof obj[key] === 'number' && isNaN(obj[key])) {
+          obj[key] = 0;
+        }
       }
-    } finally {
-      setIsPosting(false);
+    };
+
+    validateNumbers(postData.statistics);
+
+    const response = await api.post('/posts', postData);
+
+    if (response.data) {
+      // Clear localStorage and navigate as before
+      const keys = Object.keys(localStorage);
+      keys.forEach(key => {
+        if (key.startsWith('essayContent_') || 
+            key.startsWith('sectionRequirements_') || 
+            key.startsWith('sectionErrors_') || 
+            key === 'essaySections' || 
+            key === 'essayInfo' || 
+            key.startsWith('essay_') || 
+            key.includes('section')) {
+          localStorage.removeItem(key);
+        }
+      });
+
+      navigate('/home', { 
+        replace: true,
+        state: { 
+          message: 'Essay posted successfully!',
+          essayId: response.data._id
+        }
+      });
     }
-  };
+  } catch (error) {
+    console.error('Post error:', error);
+    const errorMessage = error.response?.data?.error || 
+                        error.response?.data?.message || 
+                        error.message || 
+                        'An error occurred while posting';
+    setPostingError(errorMessage);
+    
+    if (error.response?.status === 401) {
+      navigate('/login', { state: { from: location } });
+    }
+  } finally {
+    setIsPosting(false);
+  }
+};
 
   return (
     <div className="min-h-screen bg-gray-100">

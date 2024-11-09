@@ -6,6 +6,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import { Link } from 'react-router-dom';
 import UserStatistics from '../components/UserStatistics';
 import MonthlyProgressReport from '../components/MonthlyProgressReport';
+import EssayReviewStats from '../components/EssayReviewStats';
 
 const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
@@ -22,36 +23,60 @@ const Profile = () => {
   // In Profile.js, add this state with the existing state declarations
   const [monthlyStats, setMonthlyStats] = useState(null);
   const [statsError, setStatsError] = useState(null);
+  const [showStats, setShowStats] = useState(true);
+  const [postingError, setPostingError] = useState(null);
+  const [loadingPrevious, setLoadingPrevious] = useState(true);
+  const [currentEssay, setCurrentEssay] = useState(null);
+  const [previousEssays, setPreviousEssays] = useState([]);
+  const [loadingEssays, setLoadingEssays] = useState(true);
 
-  const fetchMonthlyStats = async () => {
+  const fetchEssays = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await api.get('/users/monthly-stats', {
+      const response = await api.get('/posts/user', {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-      setMonthlyStats(response.data);
-      setStatsError(null);
-    } catch (err) {
-      console.error('Error fetching monthly stats:', err);
-      // Don't set error for 404 - it's expected for new users
-      if (err.response?.status !== 404) {
-        setStatsError('Failed to load statistics');
+      
+      // Sort posts by creation date (newest first)
+      const sortedPosts = response.data.sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+      );
+      
+      // Set current essay as the most recent one
+      if (sortedPosts.length > 0) {
+        setCurrentEssay(sortedPosts[0].content);
       }
-      // Set default stats for new users or error cases
-      setMonthlyStats({
-        qualityTrends: [],
-        improvements: [],
-        focusAreas: [],
-        overallProgress: {
-          errorReduction: 0,
-          clarityImprovement: 0,
-          activeVoiceIncrease: 0
-        }
-      });
+      
+      // Set previous essays (excluding the most recent one)
+      setPreviousEssays(sortedPosts.slice(1).map(post => ({
+        content: post.content,
+        createdAt: post.createdAt
+      })));
+      
+      setLoadingEssays(false);
+    } catch (err) {
+      console.error('Error fetching essays:', err);
+      setError('Failed to load essays');
+      setLoadingEssays(false);
     }
   };
+
+  // Modify useEffect to include essay fetching
+  useEffect(() => {
+    const initializeProfile = async () => {
+      await Promise.all([
+        fetchProfile(),
+        fetchPostsData(),
+        fetchEssays(),
+      ]);
+    };
+
+    initializeProfile();
+  }, []);
+
+  
 
   const handleSave = async () => {
     try {
@@ -246,8 +271,33 @@ const Profile = () => {
             </div>
           </div>
         </div>
-        <UserStatistics />
-        <MonthlyProgressReport monthlyStats={monthlyStats} />
+
+        {/* Writing Analytics Section */}
+        {showStats && (
+          <div className="mt-8 bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-lg font-semibold">Writing Analytics</h2>
+                {loadingEssays && (
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600" />
+                )}
+              </div>
+              
+              {currentEssay ? (
+                <EssayReviewStats 
+                  currentContent={currentEssay}
+                  previousEssays={previousEssays}
+                />
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No essays available for analysis yet.</p>
+                  <p className="mt-2 text-sm">Start writing to see detailed analytics!</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="mt-8">
           <h3 className="text-2xl font-semibold mb-4">All Posts</h3>
           {userPosts.length > 0 ? (
