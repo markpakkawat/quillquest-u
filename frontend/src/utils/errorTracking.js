@@ -1,3 +1,4 @@
+// utils/errorTracking.js
 import api from '../services/api';
 
 export const ERROR_CATEGORIES = {
@@ -14,25 +15,85 @@ export const SECTION_TYPES = {
   conclusion: 'Conclusion'
 };
 
-// In errorTracking.js, add this new endpoint to your ENDPOINTS object:
 const ENDPOINTS = {
-  errors: '/statistics/errors',            // Remove /api prefix
-  completeness: '/statistics/completeness', // Remove /api prefix
-  userStats: '/statistics/monthly',         // Remove /api prefix
-  writingAnalysis: '/statistics/analysis'   // Remove /api prefix
+  base: '/users/statistics',
+  errors: '/users/statistics/errors',
+  completeness: '/users/statistics/completeness',
+  userStats: '/users/statistics/monthly',
+  analysis: {
+    conclusion: '/users/statistics/analysis/conclusion',
+    body: (timestamp) => `/users/statistics/analysis/body-${timestamp}`,
+    section: (id) => `/users/statistics/analysis/${id}`
+  }
 };
 
+// Storage helper functions
+const storage = {
+  get: (key, defaultValue = null) => {
+    try {
+      const item = localStorage.getItem(key);
+      return item ? JSON.parse(item) : defaultValue;
+    } catch (error) {
+      console.error(`Error retrieving from localStorage: ${key}`, error);
+      return defaultValue;
+    }
+  },
 
-// Update the saveWritingAnalysis function
+  set: (key, value) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch (error) {
+      console.error(`Error saving to localStorage: ${key}`, error);
+      return false;
+    }
+  }
+};
+
+// Default writing style
+const getDefaultWritingStyle = () => ({
+  tone: {
+    type: "Analyzing...",
+    confidence: 0,
+    characteristics: []
+  },
+  voice: {
+    type: "Mixed",
+    activeVoicePercentage: 0,
+    passiveVoiceInstances: 0
+  },
+  clarity: {
+    score: 0,
+    level: "Analyzing...",
+    strengths: [],
+    improvements: []
+  },
+  complexity: {
+    sentenceStructure: {
+      score: 0,
+      averageLength: 0,
+      varietyScore: 0
+    },
+    wordChoice: {
+      complexWordsPercentage: 0,
+      academicVocabularyScore: 0
+    },
+    paragraphCohesion: {
+      score: 0,
+      transitionStrength: "Analyzing...",
+      logicalFlowScore: 0
+    }
+  }
+});
+
+// Writing analysis functions
 export const saveWritingAnalysis = async (sectionId, analysisData) => {
   try {
-    // Try API first
     try {
       const response = await api.post(`${ENDPOINTS.writingAnalysis}/${sectionId}`, analysisData);
       return response.data;
     } catch (apiError) {
       console.warn('Failed to save writing analysis to API, falling back to localStorage');
-      // Fallback to localStorage
       localStorage.setItem(`writingAnalysis_${sectionId}`, JSON.stringify(analysisData));
       return analysisData;
     }
@@ -42,16 +103,15 @@ export const saveWritingAnalysis = async (sectionId, analysisData) => {
   }
 };
 
-// Update the getWritingAnalysis function
 export const getWritingAnalysis = async (sectionId) => {
   try {
     let endpoint;
     if (sectionId === 'conclusion') {
-      endpoint = '/statistics/analysis/conclusion';  // Remove /api prefix
+      endpoint = '/users/statistics/analysis/conclusion';
     } else if (sectionId.startsWith('body-')) {
-      endpoint = `/statistics/analysis/${sectionId}`; // Remove /api prefix
+      endpoint = `/users/statistics/analysis/${sectionId}`;
     } else {
-      endpoint = `/statistics/analysis/${sectionId}`; // Remove /api prefix
+      endpoint = `/users/statistics/analysis/${sectionId}`;
     }
 
     try {
@@ -87,42 +147,6 @@ export const getWritingAnalysis = async (sectionId) => {
     return getDefaultWritingStyle();
   }
 };
-
-// Separate the default style into its own function
-const getDefaultWritingStyle = () => ({
-  tone: {
-    type: "Analyzing...",
-    confidence: 0,
-    characteristics: []
-  },
-  voice: {
-    type: "Mixed",
-    activeVoicePercentage: 0,
-    passiveVoiceInstances: 0
-  },
-  clarity: {
-    score: 0,
-    level: "Analyzing...",
-    strengths: [],
-    improvements: []
-  },
-  complexity: {
-    sentenceStructure: {
-      score: 0,
-      averageLength: 0,
-      varietyScore: 0
-    },
-    wordChoice: {
-      complexWordsPercentage: 0,
-      academicVocabularyScore: 0
-    },
-    paragraphCohesion: {
-      score: 0,
-      transitionStrength: "Analyzing...",
-      logicalFlowScore: 0
-    }
-  }
-});
 
 const saveToLocalStorage = (key, data) => {
   try {
@@ -202,7 +226,34 @@ export const saveCompletenessStats = async (sectionId, completenessData, section
   }
 };
 
-// Helper function to sync all pending stats when post is created
+// Helper functions
+export const normalizeErrors = (errors) => {
+  if (Array.isArray(errors)) return errors;
+  
+  const flattenedErrors = [];
+  Object.entries(errors).forEach(([category, categoryErrors]) => {
+    if (Array.isArray(categoryErrors)) {
+      flattenedErrors.push(...categoryErrors);
+    }
+  });
+  return flattenedErrors;
+};
+
+export const getErrorsByCategory = (errors) => {
+  const normalizedErrors = normalizeErrors(errors);
+  const counts = {};
+  normalizedErrors.forEach(error => {
+    counts[error.category] = (counts[error.category] || 0) + 1;
+  });
+  return counts;
+};
+
+export const getTotalErrors = (errors) => {
+  const normalizedErrors = normalizeErrors(errors);
+  return normalizedErrors.length;
+};
+
+// Sync functions
 export const syncAllPendingStats = async (postId) => {
   try {
     // Sync error stats
@@ -278,169 +329,16 @@ export const getCompletenessStats = () => {
   }
 };
 
-// Helper function to sync pending stats when post is created
-export const syncPendingStats = async (postId) => {
-  try {
-    const errorStats = JSON.parse(localStorage.getItem('errorStats') || '[]');
-    const pendingStats = errorStats.filter(stat => stat.isPending);
-    
-    if (pendingStats.length === 0) return;
-
-    console.log('Syncing pending stats for post:', postId);
-
-    for (const stat of pendingStats) {
-      try {
-        await api.post('/statistics/errors', {
-          ...stat,
-          postId
-        });
-        
-        // Mark as synced
-        stat.isPending = false;
-        stat.syncedAt = new Date().toISOString();
-      } catch (error) {
-        console.error('Failed to sync stat:', error);
-      }
-    }
-
-    // Update localStorage with sync status
-    localStorage.setItem('errorStats', JSON.stringify(errorStats));
-
-  } catch (error) {
-    console.error('Error syncing pending stats:', error);
-  }
+export default {
+  getWritingAnalysis,
+  saveWritingAnalysis,
+  saveErrorStats,
+  getErrorsByCategory,
+  getTotalErrors,
+  syncAllPendingStats,
+  getErrorStats,
+  getCompletenessStats,
+  saveCompletenessStats,
+  ERROR_CATEGORIES,
+  SECTION_TYPES
 };
-
-// Convert categorized errors to array if needed
-const normalizeErrors = (errors) => {
-  // If it's already an array, return it
-  if (Array.isArray(errors)) {
-    return errors;
-  }
-  
-  // If it's an object with categories, flatten it
-  const flattenedErrors = [];
-  Object.entries(errors).forEach(([category, categoryErrors]) => {
-    if (Array.isArray(categoryErrors)) {
-      flattenedErrors.push(...categoryErrors);
-    }
-  });
-  return flattenedErrors;
-};
-
-const DEBUG = true;
-
-// Fallback storage handler with better error handling
-const handleStorageFallback = (key, data) => {
-  try {
-    const existingData = JSON.parse(localStorage.getItem(key) || '[]');
-    const updatedData = Array.isArray(existingData) ? [...existingData, data] : [data];
-    localStorage.setItem(key, JSON.stringify(updatedData));
-    console.log(`Data saved to localStorage: ${key}`);
-    return data;
-  } catch (error) {
-    console.error(`Failed to save to localStorage: ${key}`, error);
-    return null;
-  }
-};
-
-// Helper function to get error counts by category
-export const getErrorsByCategory = (errors) => {
-  const normalizedErrors = normalizeErrors(errors);
-  const counts = {};
-  normalizedErrors.forEach(error => {
-    counts[error.category] = (counts[error.category] || 0) + 1;
-  });
-  return counts;
-};
-
-// Helper function to calculate total errors
-export const getTotalErrors = (errors) => {
-  const normalizedErrors = normalizeErrors(errors);
-  return normalizedErrors.length;
-};
-
-// First transform the error array into category counts
-const transformErrorsToCategories = (errors) => {
-  const categoryCount = {};
-  errors.forEach(error => {
-    categoryCount[error.category] = (categoryCount[error.category] || 0) + 1;
-  });
-  return categoryCount;
-};
-
-// Helper functions remain the same
-export const calculateErrorTrends = (stats) => {
-  if (!Array.isArray(stats) || stats.length < 2) return 0;
-  
-  const firstFive = stats.slice(0, Math.min(5, Math.floor(stats.length / 2)));
-  const lastFive = stats.slice(-Math.min(5, Math.floor(stats.length / 2)));
-  
-  const earlyAvg = firstFive.reduce((sum, stat) => sum + stat.totalErrors, 0) / firstFive.length;
-  const recentAvg = lastFive.reduce((sum, stat) => sum + stat.totalErrors, 0) / lastFive.length;
-  
-  return earlyAvg === 0 ? 0 : Math.round(((earlyAvg - recentAvg) / earlyAvg) * 100);
-};
-
-export const findCommonErrors = (stats) => {
-  if (!Array.isArray(stats)) return [];
-  
-  const errorCounts = {};
-  stats.forEach(stat => {
-    if (stat.errorsByCategory) {
-      Object.entries(stat.errorsByCategory).forEach(([category, count]) => {
-        errorCounts[category] = (errorCounts[category] || 0) + count;
-      });
-    }
-  });
-  
-  return Object.entries(errorCounts)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 3)
-    .map(([category, count]) => ({
-      category: ERROR_CATEGORIES[category] || category,
-      count
-    }));
-};
-
-export const calculateSectionRates = (stats) => {
-  if (!Array.isArray(stats)) return {};
-  
-  const sectionStats = {};
-  stats.forEach(stat => {
-    if (!sectionStats[stat.sectionType]) {
-      sectionStats[stat.sectionType] = { total: 0, complete: 0 };
-    }
-    sectionStats[stat.sectionType].total++;
-    if (stat.isComplete) {
-      sectionStats[stat.sectionType].complete++;
-    }
-  });
-  
-  return Object.entries(sectionStats).reduce((acc, [type, data]) => {
-    acc[type] = Math.round((data.complete / data.total) * 100);
-    return acc;
-  }, {});
-};
-
-export const findCommonMissingRequirements = (stats) => {
-  if (!Array.isArray(stats)) return [];
-  
-  const requirements = {};
-  stats.forEach(stat => {
-    if (stat.details?.completionStatus?.missing) {
-      stat.details.completionStatus.missing.forEach(req => {
-        requirements[req] = (requirements[req] || 0) + 1;
-      });
-    }
-  });
-  
-  return Object.entries(requirements)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 3)
-    .map(([requirement, count]) => ({
-      requirement,
-      frequency: Math.round((count / stats.length) * 100)
-    }));
-};
-
