@@ -40,110 +40,132 @@ const ERROR_CATEGORIES = {
   ]
 };
 
-export const checkEssayErrors = async (content) => {
+const cleanAndParseJSON = (jsonString) => {
+  if (!jsonString) return [];
+  
+  // If it's already an object, return it
+  if (typeof jsonString === 'object') return jsonString;
+
   try {
+    // First try direct parsing
+    const parsed = JSON.parse(jsonString);
+    return parsed;
+  } catch (e) {
+    try {
+      // Extract JSON array pattern
+      let cleaned = jsonString;
+      
+      // If the response contains markdown code blocks, extract the JSON
+      const codeBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (codeBlockMatch) {
+        cleaned = codeBlockMatch[1];
+      }
+
+      // Find JSON array pattern if not in code block
+      if (!cleaned.trim().startsWith('[')) {
+        const arrayMatch = cleaned.match(/\[\s*{[\s\S]*}\s*\]/);
+        if (arrayMatch) {
+          cleaned = arrayMatch[0];
+        }
+      }
+
+      // Progressive cleaning steps
+      cleaned = cleaned
+        // Remove line breaks and extra spaces
+        .replace(/\s+/g, ' ')
+        // Remove any non-printable characters
+        .replace(/[\x00-\x1F\x7F-\x9F]/g, '')
+        // Ensure property names are properly quoted
+        .replace(/(\{|\,)\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":')
+        // Standardize quotes
+        .replace(/'/g, '"')
+        // Fix double quotes around property values
+        .replace(/:\s*"([^"]*)"/g, ':"$1"')
+        // Fix unquoted values
+        .replace(/:\s*([^,}\]]*)/g, (match, value) => {
+          // Don't quote numbers or booleans
+          if (/^(\-?\d+\.?\d*|true|false|null)$/.test(value.trim())) {
+            return `:${value.trim()}`;
+          }
+          return `:"${value.trim()}"`;
+        })
+        // Remove trailing commas
+        .replace(/,(\s*[}\]])/g, '$1')
+        // Fix escaped quotes
+        .replace(/\\"/g, '"')
+        .replace(/""/g, '"')
+        // Ensure array elements are properly separated
+        .replace(/}(\s*){/g, '},{')
+        .trim();
+
+      // Final validation and parsing
+      if (!cleaned.startsWith('[')) cleaned = `[${cleaned}]`;
+      if (!cleaned.endsWith(']')) cleaned = `${cleaned}]`;
+
+      const parsed = JSON.parse(cleaned);
+      
+      // Validate structure
+      return Array.isArray(parsed) ? parsed : [parsed];
+    } catch (innerError) {
+      console.error('JSON parsing failed:', innerError);
+      return [];
+    }
+  }
+};
+
+export const checkEssayErrors = async (content, attempt = 0) => {
+  try {
+    // Rate limiting check
+    const now = Date.now();
+    RATE_LIMIT.requests = RATE_LIMIT.requests.filter(
+      time => now - time < RATE_LIMIT.windowMs
+    );
+
+    if (RATE_LIMIT.requests.length >= RATE_LIMIT.maxRequests) {
+      const waitTime = getRetryDelay(attempt);
+      await delay(waitTime);
+      return checkEssayErrors(content, attempt + 1);
+    }
+
+    RATE_LIMIT.requests.push(now);
+
     const llm = new ChatGroq({
       apiKey: process.env.REACT_APP_GROQ_API_KEY,
       model: "llama3-70b-8192",
       temperature: 0,
-      maxTokens: 2048,
+      maxTokens: 2048
     });
 
     const systemMessage = {
       role: 'system',
-      content: `You are an advanced essay error detection system. Analyze the text and identify ALL errors without any limit, returning them ONLY as a JSON array. Check for these specific error types:
+      content: `You are an essay error detection system. Analyze the text and return ONLY a JSON array containing found errors in this exact format:
+[{
+  "category": "one of: spelling|punctuation|lexicoSemantic|stylistic|typographical",
+  "type": "specific_error_type",
+  "message": "Clear explanation of the error",
+  "suggestions": ["improvement1", "improvement2"],
+  "text": "the problematic text"
+}]
 
-1. Spelling Errors - Look for:
-   - Basic typing mistakes (e.g., "teh" instead of "the")
-   - Advanced spelling issues (i/y, s/z variations)
-   - Incorrect noun endings
-   - Agreement errors
-   - Capitalization mistakes
-   - Compound word errors
-
-2. Punctuation Errors - Check for:
-   - Missing or incorrect commas
-   - Colon and semicolon misuse
-   - Period/dot issues
-   - Missing punctuation between clauses
-   - Incorrect coordination punctuation
-
-3. Lexico-Semantic Errors - Identify:
-   - Phrases that lack clear meaning
-   - Missing necessary words
-   - Incorrect possessive forms (its/it's)
-   - Wrong word choices
-   - Semantic contradictions
-   - Improper word combinations
-
-4. Stylistic Errors - Look for:
-   - Informal language in formal context
-   - Word repetition
-   - Excessive passive voice
-   - Poor word order
-   - Overly complex sentences
-   - Awkward expressions
-
-5. Typographical Errors - Check:
-   - Spacing issues
-   - Document structure problems
-   - Layout inconsistencies
-   - Formatting errors
-
-For EACH error found, create an object:
-{
-  "category": "exactly one of: spelling, punctuation, lexicoSemantic, stylistic, typographical",
-  "type": "specific subcategory from the error type list",
-  "message": "clear explanation of the error",
-  "suggestions": ["specific correction suggestions"],
-  "text": "the exact problematic text"
-}
-
-IMPORTANT:
-- Return ALL errors found, with no limit per category
-- Do not skip any errors
-- Include every instance of repeated errors
-- Return ONLY the JSON array, with no additional text or explanations
-- Check the entire text thoroughly`
+Return only the JSON array, no other text or explanation. Ensure all strings use double quotes, not single quotes.`
     };
 
-    const userMessage = {
-      role: 'user',
-      content: `Analyze this text for ALL errors and return ONLY a JSON array. Find every single error: "${content}"`
-    };
+    const response = await llm.invoke([
+      systemMessage,
+      { role: 'user', content: `Find errors in this text: "${content}"` }
+    ]);
 
-    const aiResponse = await llm.invoke([systemMessage, userMessage]);
+    const errors = cleanAndParseJSON(response.content);
     
-    // Parse response
-    let errors = [];
-    const possibleJSON = aiResponse.content.trim();
-    
-    try {
-      errors = JSON.parse(possibleJSON);
-    } catch (e) {
-      const jsonMatch = possibleJSON.match(/\[\s*\{[\s\S]*\}\s*\]/);
-      if (jsonMatch) {
-        try {
-          errors = JSON.parse(jsonMatch[0]);
-        } catch (innerError) {
-          console.error('Failed to parse extracted JSON:', innerError);
-        }
-      }
-    }
-
-    if (!Array.isArray(errors)) {
-      console.error('AI response is not an array:', errors);
-      errors = [];
-    }
-
-    // Validate and categorize errors - now without limits
+    // Validate and categorize errors
     const categorizedErrors = Object.keys(ERROR_CATEGORIES).reduce((acc, category) => {
       acc[category] = errors
-        .filter(error => error.category === category)
+        .filter(error => error?.category?.toLowerCase() === category.toLowerCase())
         .map(error => ({
-          ...error,
-          suggestions: Array.isArray(error.suggestions) ? 
-            error.suggestions : []
+          text: String(error.text || ''),
+          message: String(error.message || ''),
+          type: String(error.type || ''),
+          suggestions: Array.isArray(error.suggestions) ? error.suggestions.map(String) : []
         }));
       return acc;
     }, {});
@@ -158,6 +180,12 @@ IMPORTANT:
     return categorizedErrors;
 
   } catch (error) {
+    if (error.response?.status === 429) {
+      const waitTime = getRetryDelay(attempt);
+      await delay(waitTime);
+      return checkEssayErrors(content, attempt + 1);
+    }
+
     console.error('Error checking essay:', error);
     return Object.keys(ERROR_CATEGORIES).reduce((acc, category) => {
       acc[category] = [];

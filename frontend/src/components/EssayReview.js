@@ -129,11 +129,47 @@ export const EssayReview = () => {
           </div>
         </header>
 
-        {/* Main content */}
-        <main className="flex-1 p-6">
-          <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg p-6">
-            <div className="space-y-4">
-              <div className="prose max-w-none text-left">
+      {/* Error Message */}
+      {postingError && (
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 fixed top-20 right-4 max-w-md">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <XIcon className="h-5 w-5 text-red-400" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-red-700">{postingError}</p>
+            </div>
+            <button 
+              onClick={() => setPostingError(null)}
+              className="ml-auto pl-3"
+            >
+              <XIcon className="h-5 w-5 text-red-400 hover:text-red-500" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto p-6">
+        <div className="space-y-8">
+          {/* Statistics Section */}
+          {showStats && (
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+              <div className="p-6">
+                <h2 className="text-lg font-semibold mb-6">Essay Analysis</h2>
+                <EssayReviewStats 
+                  sections={allSections}
+                  loading={loadingStats}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Essay Content */}
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="p-6">
+              <h2 className="text-lg font-semibold mb-6">Essay Content</h2>
+              <div className="prose max-w-none">
                 {allSections?.map((section, index) => (
                   <div key={section.id} className="mb-8">
                     <h2 className="text-xl font-semibold mb-4">{section.title}</h2>

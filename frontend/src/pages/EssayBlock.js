@@ -580,80 +580,206 @@ export default function EssayBlock() {
     }
   };
 
-
-// Update the handleComplete function
-const handleComplete = async () => {
-  if (!essayContent.trim()) {
-    alert('Please write some content before completing this section.');
-    return;
-  }
-
-  // Save current content before proceeding
-  localStorage.setItem(`essayContent_${sectionId}`, essayContent);
+  const handleComplete = async () => {
+    if (!essayContent.trim()) {
+      alert('Please write some content before completing this section.');
+      return;
+    }
   
-  setIsCompleting(true);
-  try {
-    const currentSectionIndex = allSections.findIndex(s => s.id === sectionId);
-    const nextSectionIndex = currentSectionIndex + 1;
-    const prevSectionId = currentSectionIndex > 0 ? allSections[currentSectionIndex - 1].id : null;
-    const previousContent = prevSectionId ? localStorage.getItem(`essayContent_${prevSectionId}`) : null;
-    const hasPreviousContent = localStorage.getItem(`essayContent_${sectionId}`)?.trim();
-
-    // Now we can use hasPreviousContent since it's been declared
-    const isIntroduction = section?.title.toLowerCase().includes('introduction');
-    const isBodyParagraph = section?.title.toLowerCase().includes('body paragraph');
-    const isConclusion = section?.title.toLowerCase().includes('conclusion');
-    const isRevisionAttempt = hasPreviousContent && isRevision;
-
-    const completenessAnalysis = await checkSectionCompleteness(
-      essayContent, 
-      section?.title,
-      previousContent
-    );
-
-    // Initialize updatedSections at the beginning
-    let updatedSections = allSections.map(s => 
-      s.id === sectionId ? { ...s, percentage: 50 } : s
-    );
-
-    // Handle sections based on type and completeness
-    if (isBodyParagraph) {
-      // Check if there's a next body paragraph
-      const nextBodyParagraph = nextSectionIndex < allSections.length && 
-        allSections[nextSectionIndex].title.toLowerCase().includes('body paragraph');
-      
-      const conclusionSection = allSections.find(s => 
-        s.title.toLowerCase().includes('conclusion')
+    // Save current content before proceeding
+    localStorage.setItem(`essayContent_${sectionId}`, essayContent);
+    
+    setIsCompleting(true);
+    try {
+      const currentSectionIndex = allSections.findIndex(s => s.id === sectionId);
+      const nextSectionIndex = currentSectionIndex + 1;
+      const prevSectionId = currentSectionIndex > 0 ? allSections[currentSectionIndex - 1].id : null;
+      const previousContent = prevSectionId ? localStorage.getItem(`essayContent_${prevSectionId}`) : null;
+      const hasPreviousContent = localStorage.getItem(`essayContent_${sectionId}`)?.trim();
+  
+      // Get section types
+      const isIntroduction = section?.title.toLowerCase().includes('introduction');
+      const isBodyParagraph = section?.title.toLowerCase().includes('body paragraph');
+      const isConclusion = section?.title.toLowerCase().includes('conclusion');
+      const isRevisionAttempt = hasPreviousContent && isRevision;
+  
+      // Run completeness check and writing analysis in parallel
+      const [completenessAnalysis] = await Promise.all([
+        checkSectionCompleteness(essayContent, section?.title, previousContent),
+        saveWritingAnalysis(essayContent)
+      ]);
+  
+      // Save completeness statistics
+      await saveCompletenessStats(sectionId, completenessAnalysis, section?.title);
+  
+      // Initialize updatedSections
+      let updatedSections = allSections.map(s => 
+        s.id === sectionId ? { ...s, percentage: 50 } : s
       );
-    
-      if (completenessAnalysis.isComplete) {
-        localStorage.removeItem(`sectionRequirements_${sectionId}`);
-        
-        const updatedSections = allSections.map(s => 
-          s.id === sectionId ? { ...s, percentage: 100 } : s
+  
+      // Handle Introduction
+      if (isIntroduction) {
+        // Get existing body paragraphs
+        const existingBodyParagraphs = allSections.filter(s => 
+          s.title.toLowerCase().includes('body paragraph')
         );
-    
+  
+        if (!completenessAnalysis.isComplete) {
+          // Handle incomplete introduction
+          localStorage.setItem(`sectionRequirements_${sectionId}`, JSON.stringify({
+            missing: completenessAnalysis.completionStatus.missing,
+            improvements: completenessAnalysis.suggestedImprovements
+          }));
+          
+          setCompletionRequirements({
+            missing: completenessAnalysis.completionStatus.missing,
+            improvements: completenessAnalysis.suggestedImprovements,
+            isRevision: isRevisionAttempt,
+            hasBodyParagraphs: hasExistingBodyParagraphs,
+            isComplete: false,
+            onAddBodyParagraph: handleAddNewBodyParagraph
+          });
+        } else {
+          // Handle complete introduction
+          localStorage.removeItem(`sectionRequirements_${sectionId}`);
+          updatedSections = allSections.map(s => 
+            s.id === sectionId ? { ...s, percentage: 100 } : s
+          );
+  
+          const nextSection = updatedSections[nextSectionIndex];
+          setCompletionRequirements({
+            isComplete: true,
+            missing: [],
+            improvements: [],
+            hasBodyParagraphs: existingBodyParagraphs.length > 0,
+            onAddNewBodyParagraph: handleAddNewBodyParagraph,
+            onContinue: nextSection ? () => {
+              setShowRequirementsModal(false);
+              navigate(`/essayblock/${nextSection.id}`, {
+                state: {
+                  section: nextSection,
+                  allSections: updatedSections,
+                  essayInfo
+                }
+              });
+            } : undefined,
+            onRegenerateBodyParagraphs: async () => {
+              try {
+                const thesisPoints = await parseThesisPoints(essayContent);
+                const newBodySections = await generateBodySections(thesisPoints.mainPoints);
+                
+                // Remove existing body paragraphs
+                const filteredSections = updatedSections.filter(s => 
+                  !s.title.toLowerCase().includes('body paragraph')
+                );
+                
+                // Find where to insert new body paragraphs
+                const afterIntroIndex = filteredSections.findIndex(s => 
+                  s.title.toLowerCase().includes('introduction')
+                ) + 1;
+                
+                // Create final sections array
+                const finalSections = [
+                  ...filteredSections.slice(0, afterIntroIndex),
+                  ...newBodySections,
+                  ...filteredSections.slice(afterIntroIndex)
+                ];
+                
+                setShowRequirementsModal(false);
+                navigate(`/essayblock/${newBodySections[0].id}`, {
+                  state: {
+                    section: newBodySections[0],
+                    allSections: finalSections,
+                    essayInfo
+                  }
+                });
+              } catch (error) {
+                console.error('Error generating new body sections:', error);
+                alert('Failed to generate new body paragraphs. Please try again.');
+              }
+            }
+          });
+        }
+        setShowRequirementsModal(true);
+        setIsCompleting(false);
+        return;
+      }
+  
+      // Handle Body Paragraphs
+      if (isBodyParagraph) {
+        const nextBodyParagraph = nextSectionIndex < allSections.length && 
+          allSections[nextSectionIndex].title.toLowerCase().includes('body paragraph');
+        
+        const conclusionSection = allSections.find(s => 
+          s.title.toLowerCase().includes('conclusion')
+        );
+      
+        if (completenessAnalysis.isComplete) {
+          localStorage.removeItem(`sectionRequirements_${sectionId}`);
+          
+          updatedSections = allSections.map(s => 
+            s.id === sectionId ? { ...s, percentage: 100 } : s
+          );
+      
+          setCompletionRequirements({
+            isComplete: true,
+            missing: [],
+            improvements: [],
+            hasBodyParagraphs: hasExistingBodyParagraphs,
+            onAddNewBodyParagraph: handleAddNewBodyParagraph,
+            onContinue: nextBodyParagraph ? () => {
+              setShowRequirementsModal(false);
+              navigate(`/essayblock/${updatedSections[nextSectionIndex].id}`, {
+                state: {
+                  section: updatedSections[nextSectionIndex],
+                  allSections: updatedSections,
+                  essayInfo
+                }
+              });
+            } : undefined,
+            onMoveToConclusion: conclusionSection ? () => {
+              setShowRequirementsModal(false);
+              navigate(`/essayblock/${conclusionSection.id}`, {
+                state: {
+                  section: conclusionSection,
+                  allSections: updatedSections,
+                  essayInfo
+                }
+              });
+            } : undefined
+          });
+          setShowRequirementsModal(true);
+          setIsCompleting(false);
+          return;
+        }
+      
+        // Handle incomplete body paragraph
+        localStorage.setItem(`sectionRequirements_${sectionId}`, JSON.stringify({
+          missing: completenessAnalysis.completionStatus.missing,
+          improvements: completenessAnalysis.suggestedImprovements
+        }));
+        
         setCompletionRequirements({
-          isComplete: true,
-          missing: [],
-          improvements: [],
+          missing: completenessAnalysis.completionStatus.missing,
+          improvements: completenessAnalysis.suggestedImprovements,
+          isComplete: false,
           hasBodyParagraphs: hasExistingBodyParagraphs,
           onAddNewBodyParagraph: handleAddNewBodyParagraph,
-          onContinue: nextBodyParagraph ? () => {
-            setShowRequirementsModal(false);
-            navigate(`/essayblock/${updatedSections[nextSectionIndex].id}`, {
-              state: {
-                section: updatedSections[nextSectionIndex],
-                allSections: updatedSections,
-                essayInfo
-              }
-            });
-          } : undefined,
           onMoveToConclusion: conclusionSection ? () => {
             setShowRequirementsModal(false);
             navigate(`/essayblock/${conclusionSection.id}`, {
               state: {
                 section: conclusionSection,
+                allSections: updatedSections,
+                essayInfo
+              }
+            });
+          } : undefined,
+          onContinue: nextBodyParagraph ? () => {
+            setShowRequirementsModal(false);
+            navigate(`/essayblock/${updatedSections[nextSectionIndex].id}`, {
+              state: {
+                section: updatedSections[nextSectionIndex],
                 allSections: updatedSections,
                 essayInfo
               }
@@ -664,197 +790,46 @@ const handleComplete = async () => {
         setIsCompleting(false);
         return;
       }
-    
-      // Handle incomplete body paragraph
-      localStorage.setItem(`sectionRequirements_${sectionId}`, JSON.stringify({
-        missing: completenessAnalysis.completionStatus.missing,
-        improvements: completenessAnalysis.suggestedImprovements
-      }));
       
-      setCompletionRequirements({
-        missing: completenessAnalysis.completionStatus.missing,
-        improvements: completenessAnalysis.suggestedImprovements,
-        isComplete: false,
-        hasBodyParagraphs: hasExistingBodyParagraphs,
-        onAddNewBodyParagraph: handleAddNewBodyParagraph,
-        onMoveToConclusion: conclusionSection ? () => {
-          setShowRequirementsModal(false);
-          navigate(`/essayblock/${conclusionSection.id}`, {
-            state: {
-              section: conclusionSection,
-              allSections: updatedSections,
-              essayInfo
-            }
-          });
-        } : undefined,
-        onContinue: nextBodyParagraph ? () => {
-          setShowRequirementsModal(false);
-          navigate(`/essayblock/${updatedSections[nextSectionIndex].id}`, {
-            state: {
-              section: updatedSections[nextSectionIndex],
-              allSections: updatedSections,
-              essayInfo
-            }
-          });
-        } : undefined
-      });
-      setShowRequirementsModal(true);
-      setIsCompleting(false);
-      return;
-    }
-    
-    if (isConclusion) {
-      const updatedSections = allSections.map(s => 
-        s.id === sectionId ? { ...s, percentage: completenessAnalysis.isComplete ? 100 : 50 } : s
-      );
-    
-      if (!completenessAnalysis.isComplete) {
-        localStorage.setItem(`sectionRequirements_${sectionId}`, JSON.stringify({
+      // Handle Conclusion
+      if (isConclusion) {
+        updatedSections = allSections.map(s => 
+          s.id === sectionId ? { ...s, percentage: completenessAnalysis.isComplete ? 100 : 50 } : s
+        );
+      
+        if (!completenessAnalysis.isComplete) {
+          localStorage.setItem(`sectionRequirements_${sectionId}`, JSON.stringify({
+            missing: completenessAnalysis.completionStatus.missing,
+            improvements: completenessAnalysis.suggestedImprovements
+          }));
+        }
+      
+        setCompletionRequirements({
           missing: completenessAnalysis.completionStatus.missing,
-          improvements: completenessAnalysis.suggestedImprovements
-        }));
-      }
-    
-      setCompletionRequirements({
-        missing: completenessAnalysis.completionStatus.missing,
-        improvements: completenessAnalysis.suggestedImprovements,
-        isComplete: completenessAnalysis.isComplete,
-        onCompleteEssay: () => {
-          setShowRequirementsModal(false);
-          navigate('/essayreview', {
-            state: {
-              allSections: updatedSections,
-              essayInfo
-            }
-          });
-        }
-      });
-      setShowRequirementsModal(true);
-      setIsCompleting(false);
-      return;
-    }
-
-    // Handle introduction
-    if (isIntroduction && !completenessAnalysis.isComplete) {
-      // Save requirements first
-      localStorage.setItem(`sectionRequirements_${sectionId}`, JSON.stringify({
-        missing: completenessAnalysis.completionStatus.missing,
-        improvements: completenessAnalysis.suggestedImprovements
-      }));
-    
-      setCompletionRequirements({
-        missing: completenessAnalysis.completionStatus.missing,
-        improvements: completenessAnalysis.suggestedImprovements,
-        isRevision: isRevisionAttempt,
-        hasBodyParagraphs: hasExistingBodyParagraphs,
-        isComplete: false,
-        onAddBodyParagraph: () => {
-          const conclusionIndex = allSections.findIndex(s => 
-            s.title.toLowerCase().includes('conclusion')
-          );
-        
-          const bodyParagraphs = allSections
-            .filter(s => s.title.toLowerCase().includes('body paragraph'))
-            .sort((a, b) => {
-              const numA = parseInt(a.title.match(/\d+/)[0]);
-              const numB = parseInt(b.title.match(/\d+/)[0]);
-              return numA - numB;
-            });
-        
-          const newBodySection = {
-            id: `body-${Date.now()}`,
-            title: `Body Paragraph ${bodyParagraphs.length + 1}`,
-            type: 'body',
-            percentage: 0
-          };
-        
-          let newUpdatedSections;
-          if (conclusionIndex !== -1) {
-            newUpdatedSections = [
-              ...allSections.slice(0, conclusionIndex),
-              newBodySection,
-              ...allSections.slice(conclusionIndex)
-            ];
-          } else {
-            newUpdatedSections = [...allSections, newBodySection];
-          }
-        
-          setShowRequirementsModal(false);
-          navigate(`/essayblock/${newBodySection.id}`, {
-            state: {
-              section: newBodySection,
-              allSections: newUpdatedSections,
-              essayInfo
-            }
-          });
-        }
-      });
-      
-      setShowRequirementsModal(true);
-      setIsCompleting(false);
-      return;
-    }
-
-    // Handle complete introduction with existing body paragraphs
-    if (isIntroduction && completenessAnalysis.isComplete && existingBodyParagraphs.length > 0) {
-      localStorage.removeItem(`sectionRequirements_${sectionId}`);
-      const updatedSections = allSections.map(s => 
-        s.id === sectionId ? { ...s, percentage: 100 } : s
-      );
-
-      setCompletionRequirements({
-        isComplete: true,
-        hasBodyParagraphs: true,
-        onKeepExisting: () => {
-          setShowRequirementsModal(false);
-          navigate(`/essayblock/${existingBodyParagraphs[0].id}`, {
-            state: {
-              section: existingBodyParagraphs[0],
-              allSections: updatedSections,
-              essayInfo
-            }
-          });
-        },
-        onRegenerateBodyParagraphs: async () => {
-          try {
-            const thesisPoints = await parseThesisPoints(essayContent);
-            const newBodySections = await generateBodySections(thesisPoints.mainPoints);
-            const filteredSections = updatedSections.filter(s => 
-              !s.title.toLowerCase().includes('body paragraph')
-            );
-            const afterIntroIndex = filteredSections.findIndex(s => 
-              s.title.toLowerCase().includes('introduction')
-            ) + 1;
-            const finalSections = [
-              ...filteredSections.slice(0, afterIntroIndex),
-              ...newBodySections,
-              ...filteredSections.slice(afterIntroIndex)
-            ];
+          improvements: completenessAnalysis.suggestedImprovements,
+          isComplete: completenessAnalysis.isComplete,
+          onCompleteEssay: () => {
             setShowRequirementsModal(false);
-            navigate(`/essayblock/${newBodySections[0].id}`, {
+            navigate('/essayreview', {
               state: {
-                section: newBodySections[0],
-                allSections: finalSections,
+                allSections: updatedSections,
                 essayInfo
               }
             });
-          } catch (error) {
-            console.error('Error generating new body sections:', error);
-            alert('Failed to generate new body paragraphs. Please try again.');
           }
-        }
-      });
-      setShowRequirementsModal(true);
+        });
+        setShowRequirementsModal(true);
+        setIsCompleting(false);
+        return;
+      }
+  
+    } catch (error) {
+      console.error('Error during completion:', error);
+      alert('There was an error processing the section. Please try again.');
+    } finally {
       setIsCompleting(false);
-      return;
     }
-  } catch (error) {
-    console.error('Error during completion:', error);
-    alert('There was an error processing the section. Please try again.');
-  } finally {
-    setIsCompleting(false);
-  }
-};
+  };
 
 const renderErrorPanel = () => {
   if (!errors[activeErrorCategory]?.length) {

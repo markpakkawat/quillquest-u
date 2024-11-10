@@ -17,6 +17,7 @@ import EssayBlock from './pages/EssayBlock';
 import { EssayReview } from './components/EssayReview';
 import EmailVerificationInstructions from './pages/EmailVerificationInstructions';
 import VerifyEmail from './pages/VerifyEmail';
+import LandingPage from './pages/LandingPage';
 
 function App() {
   return (
@@ -26,8 +27,9 @@ function App() {
           <Route path="/reset-password/:token" element={<ResetPasswordForm />} />
           <Route path='/reset-password' element={<ResetPassword />} />
           
+          
           {/* Prevent access to login/register if already logged in */}
-          <Route path="/" element={<AuthenticatedRoute><Login /></AuthenticatedRoute>} />
+          <Route path="/" element={<AuthenticatedRoute><LandingPage /></AuthenticatedRoute>} />
           <Route path="/login" element={<AuthenticatedRoute><Login /></AuthenticatedRoute>} />
           <Route path="/register" element={<AuthenticatedRoute><Register /></AuthenticatedRoute>} />
           <Route path="/verify-email-instructions" element={<AuthenticatedRoute><EmailVerificationInstructions /></AuthenticatedRoute>} />
