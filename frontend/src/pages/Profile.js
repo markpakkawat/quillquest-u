@@ -90,133 +90,6 @@ const Profile = () => {
     historical: null
   });
 
-  const fetchStatistics = async () => {
-    try {
-      const essaySections = JSON.parse(localStorage.getItem('essaySections') || '[]');
-      const errorStats = JSON.parse(localStorage.getItem('errorStats') || '[]');
-      const completenessStats = JSON.parse(localStorage.getItem('completenessStats') || '[]');
-
-      console.log('Local stats:', {
-        sections: essaySections.length,
-        errors: errorStats,
-        completeness: completenessStats
-      });
-
-      const token = localStorage.getItem('token');
-      let writingStatsResponse;
-      try {
-        writingStatsResponse = await api.get('/users/statistics/writing-stats', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        console.log('API writing stats response:', writingStatsResponse.data);
-      } catch (apiError) {
-        console.warn('Failed to fetch writing stats from API:', apiError);
-        writingStatsResponse = { data: null };
-      }
-
-      const latestPost = userPosts[0];
-      let latestPostAnalysis = null;
-
-      if (latestPost?.content) {
-        try {
-          latestPostAnalysis = await analyzeWritingStyle(latestPost.content);
-          console.log('Latest post analysis:', latestPostAnalysis);
-        } catch (error) {
-          console.warn('Error analyzing latest post:', error);
-        }
-      }
-
-      const currentSessionStats = {
-        essaySections,
-        errorStats,
-        completenessStats,
-        currentErrors: {},
-        totalErrors: 0,
-        errorTrends: [],
-        sectionRates: {},
-        commonMissingRequirements: [],
-        completionStatus: {
-          totalSections: essaySections.length,
-          completedSections: completenessStats.filter(stat => stat.isComplete).length,
-          completionRate: essaySections.length > 0 
-            ? Math.round((completenessStats.filter(stat => stat.isComplete).length / essaySections.length) * 100)
-            : 0
-        }
-      };
-
-      // Calculate error statistics
-      if (errorStats.length > 0) {
-        currentSessionStats.totalErrors = errorStats.reduce((sum, stat) => 
-          sum + (stat.totalErrors || 0), 0
-        );
-        
-        // Process errors by category
-        errorStats.forEach(stat => {
-          if (stat.errorsByCategory) {
-            Object.entries(stat.errorsByCategory).forEach(([category, count]) => {
-              currentSessionStats.currentErrors[category] = 
-                (currentSessionStats.currentErrors[category] || 0) + count;
-            });
-          }
-        });
-      }
-
-      const historicalData = {
-        ...writingStatsResponse?.data,
-        qualityMetrics: {
-          ...(writingStatsResponse?.data?.qualityMetrics || {}),
-          ...(latestPostAnalysis && {
-            clarity: latestPostAnalysis.clarity?.score || 0,
-            complexity: latestPostAnalysis.complexity?.sentenceStructure?.score || 0,
-            activeVoice: latestPostAnalysis.voice?.activeVoicePercentage || 0,
-            errorRate: currentSessionStats.totalErrors / Math.max(1, errorStats.length)
-          })
-        },
-        writingStyle: latestPostAnalysis,
-        currentErrors: currentSessionStats.currentErrors,
-        completionStatus: currentSessionStats.completionStatus
-      };
-
-      console.log('Setting statistics data:', {
-        currentSession: currentSessionStats,
-        historical: historicalData
-      });
-
-      setStatisticsData({
-        currentSession: currentSessionStats,
-        historical: historicalData
-      });
-
-    } catch (error) {
-      console.error('Error fetching statistics:', error);
-      setStatisticsData({
-        currentSession: {
-          essaySections: [],
-          errorStats: [],
-          completenessStats: [],
-          currentErrors: {},
-          totalErrors: 0,
-          errorTrends: [],
-          sectionRates: {},
-          commonMissingRequirements: [],
-          completionStatus: {
-            totalSections: 0,
-            completedSections: 0,
-            completionRate: 0
-          }
-        },
-        historical: {
-          qualityMetrics: {
-            clarity: 0,
-            complexity: 0,
-            activeVoice: 0,
-            errorRate: 0
-          }
-        }
-      });
-    }
-  };
-
   const fetchProfile = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -282,7 +155,6 @@ const Profile = () => {
         await Promise.all([
           fetchProfile(),
           fetchPostsData(),
-          fetchStatistics()
         ]);
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -443,25 +315,6 @@ const Profile = () => {
             </div>
           </div>
 
-          {/* Statistics Section */}
-          <div className="bg-white shadow-md rounded-lg overflow-hidden">
-            <UserStatistics 
-              statistics={{
-                ...statisticsData.historical,
-                writingStyle: statisticsData.historical?.writingStyle || null,
-                currentErrors: statisticsData.currentSession?.currentErrors,
-                completionStatus: statisticsData.currentSession?.completionStatus,
-                recentActivity: {
-                  completedPosts: userPosts.filter(post => post.isComplete).length || 0,
-                  totalPosts: postsCount,
-                  averageWordCount: avgWordCount
-                }
-              }}
-              postsCount={postsCount}
-              avgWordCount={avgWordCount}
-              loading={isLoading}
-            />
-          </div>
           
           {/* Posts Section */}
           <div className="mt-8">
