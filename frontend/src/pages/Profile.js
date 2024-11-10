@@ -20,6 +20,53 @@ const Notification = ({ message, type, onClose }) => {
   );
 };
 
+const processLocalStats = (essaySections, errorStats, completenessStats) => {
+  const currentSessionStats = {
+    essaySections,
+    errorStats,
+    completenessStats,
+    currentErrors: {},
+    totalErrors: 0,
+    errorTrends: [],
+    sectionRates: {},
+    commonMissingRequirements: [],
+    completionStatus: {
+      totalSections: essaySections.length,
+      completedSections: completenessStats.filter(stat => stat.isComplete).length,
+      completionRate: essaySections.length > 0 
+        ? Math.round((completenessStats.filter(stat => stat.isComplete).length / essaySections.length) * 100)
+        : 0
+    }
+  };
+
+  if (errorStats.length > 0) {
+    currentSessionStats.totalErrors = errorStats.reduce((sum, stat) => 
+      sum + (stat.totalErrors || 0), 0
+    );
+    
+    errorStats.forEach(stat => {
+      if (stat.errorsByCategory) {
+        Object.entries(stat.errorsByCategory).forEach(([category, count]) => {
+          currentSessionStats.currentErrors[category] = 
+            (currentSessionStats.currentErrors[category] || 0) + count;
+        });
+      }
+    });
+  }
+
+  return {
+    currentSession: currentSessionStats,
+    historical: {
+      qualityMetrics: {
+        clarity: 0,
+        complexity: 0,
+        activeVoice: 0,
+        errorRate: currentSessionStats.totalErrors / (essaySections.length || 1)
+      }
+    }
+  };
+};
+
 const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [username, setUsername] = useState(null);
@@ -48,31 +95,33 @@ const Profile = () => {
       const essaySections = JSON.parse(localStorage.getItem('essaySections') || '[]');
       const errorStats = JSON.parse(localStorage.getItem('errorStats') || '[]');
       const completenessStats = JSON.parse(localStorage.getItem('completenessStats') || '[]');
-
-      const token = localStorage.getItem('token');
-      const writingStatsResponse = await api.get('/users/writing-stats', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
+  
+      const writingStatsResponse = await api.statistics.getWritingStats();
+      console.log('Received writing stats:', writingStatsResponse.data);
+  
+      // Calculate error rate from local data
+      const totalErrors = errorStats.reduce((sum, stat) => sum + (stat.totalErrors || 0), 0);
+      const errorRate = essaySections.length ? totalErrors / essaySections.length : 0;
+      console.log('Local error stats:', { totalErrors, essaySections: essaySections.length, errorRate });
+  
       const latestPost = userPosts[0];
       let latestPostAnalysis = null;
-
+  
       if (latestPost?.content) {
         try {
           latestPostAnalysis = await analyzeWritingStyle(latestPost.content);
+          console.log('Latest post analysis:', latestPostAnalysis);
         } catch (error) {
           console.warn('Error analyzing latest post:', error);
         }
       }
-
+  
       const currentSessionStats = {
         essaySections,
         errorStats,
         completenessStats,
         currentErrors: {},
-        totalErrors: 0,
+        totalErrors,
         errorTrends: [],
         sectionRates: {},
         commonMissingRequirements: [],
@@ -84,22 +133,17 @@ const Profile = () => {
             : 0
         }
       };
-
-      if (errorStats.length > 0) {
-        currentSessionStats.totalErrors = errorStats.reduce((sum, stat) => 
-          sum + (stat.totalErrors || 0), 0
-        );
-        
-        errorStats.forEach(stat => {
-          if (stat.errorsByCategory) {
-            Object.entries(stat.errorsByCategory).forEach(([category, count]) => {
-              currentSessionStats.currentErrors[category] = 
-                (currentSessionStats.currentErrors[category] || 0) + count;
-            });
-          }
-        });
-      }
-
+  
+      // Calculate current errors by category
+      errorStats.forEach(stat => {
+        if (stat.errorsByCategory) {
+          Object.entries(stat.errorsByCategory).forEach(([category, count]) => {
+            currentSessionStats.currentErrors[category] = 
+              (currentSessionStats.currentErrors[category] || 0) + count;
+          });
+        }
+      });
+  
       const historicalData = {
         ...writingStatsResponse.data,
         qualityMetrics: {
@@ -107,18 +151,27 @@ const Profile = () => {
           ...(latestPostAnalysis && {
             clarity: latestPostAnalysis.clarity.score,
             complexity: latestPostAnalysis.complexity.sentenceStructure.score,
-            activeVoice: latestPostAnalysis.voice.activeVoicePercentage,
-            errorRate: currentSessionStats.totalErrors / (essaySections.length || 1)
-          })
+            activeVoice: latestPostAnalysis.voice.activeVoicePercentage
+          }),
+          errorRate: errorRate // Use calculated error rate
         },
         writingStyle: latestPostAnalysis
       };
-
+  
+      console.log('Setting statistics data:', {
+        currentSession: {
+          totalErrors,
+          essayCount: essaySections.length,
+          errorRate
+        },
+        qualityMetrics: historicalData.qualityMetrics
+      });
+  
       setStatisticsData({
         currentSession: currentSessionStats,
         historical: historicalData
       });
-
+  
     } catch (error) {
       console.error('Error fetching statistics:', error);
       setStatisticsData({
@@ -374,12 +427,16 @@ const Profile = () => {
         <UserStatistics 
           statistics={{
             ...statisticsData.historical,
-            qualityMetrics: statisticsData.historical?.qualityMetrics || {
-              clarity: 0,
-              complexity: 0,
-              activeVoice: 0,
-              errorRate: 0
-            },
+            qualityMetrics: (() => {
+              const metrics = statisticsData.historical?.qualityMetrics || {
+                clarity: 0,
+                complexity: 0,
+                activeVoice: 0,
+                errorRate: 0
+              };
+              console.log('Passing quality metrics to UserStatistics:', metrics);
+              return metrics;
+            })(),
             recentActivity: {
               completedPosts: userPosts.filter(post => post.isComplete).length || 0
             },

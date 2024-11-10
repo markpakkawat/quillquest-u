@@ -1,23 +1,31 @@
 import axios from 'axios';
-import { logout } from '../context/AuthContext.js';
+import { logout as defaultLogout } from '../context/AuthContext.js';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001/api';
+
+// Logout handler configuration
+let logoutHandler = defaultLogout;
+
+export const setLogoutHandler = (handler) => {
+  logoutHandler = handler || defaultLogout;
+};
 
 // API route configuration
 export const API_ROUTES = {
   statistics: {
-    base: '/statistics',
+    base: '/users/statistics',  // Update base path
     analysis: {
-      conclusion: '/statistics/analysis/conclusion',
-      body: (timestamp) => `/statistics/analysis/body-${timestamp}`,
-      section: (id) => `/statistics/analysis/${id}`,
+      conclusion: '/users/statistics/analysis/conclusion',
+      body: (timestamp) => `/users/statistics/analysis/body-${timestamp}`,
+      section: (id) => `/users/statistics/analysis/${id}`,
     },
-    errors: '/statistics/errors',
-    completeness: '/statistics/completeness',
-    monthly: '/statistics/monthly',
-    writingStats: '/statistics/writing-stats'
+    errors: '/users/statistics/errors',
+    completeness: '/users/statistics/completeness',
+    monthly: '/users/statistics/monthly',
+    writingStats: '/users/statistics/writing-stats'  // Update writing stats path
   }
 };
+
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -125,7 +133,7 @@ api.interceptors.response.use(
         case 401:
           logWithDetails('Authentication Error', errorDetails);
           localStorage.removeItem('token');
-          logout(); // Call the imported logout function
+          logoutHandler(); // Use the configured logout handler
           break;
 
         case 403:

@@ -2,18 +2,17 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middlewares/authMiddleware');
-const statisticsController = require('../controllers/statisticsController');
+const {
+  getMonthlyStats,
+  getErrorStats,
+  saveErrorStats,
+  getWritingStats
+} = require('../controllers/statisticsController');
 
-// Base route: /api/statistics
-router.get('/analysis/conclusion', protect, statisticsController.getConclusionAnalysis);
-router.get('/users/statistics/analysis/conclusion', protect, statisticsController.getConclusionAnalysis);
-router.get('/users/statistics/analysis/body-:timestamp', protect, statisticsController.getBodyAnalysis);
-router.get('/users/statistics/analysis/:sectionId', protect, statisticsController.getWritingAnalysis);
-
-router.get('/errors', protect, statisticsController.getErrorStats);
-router.get('/monthly', protect, statisticsController.getMonthlyStats);
-router.post('/errors', protect, statisticsController.saveErrorStats);
-router.post('/completeness', protect, statisticsController.saveCompletenessStats);
+// Base route: /api/statistics or /api/users/statistics
+router.get('/monthly', protect, getMonthlyStats);
+router.get('/errors', protect, getErrorStats);
+router.post('/errors', protect, saveErrorStats);
+router.get('/writing-stats', protect, getWritingStats);
 
 module.exports = router;
-

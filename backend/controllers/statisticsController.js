@@ -53,17 +53,23 @@ const calculateOverallProgress = (posts) => {
   };
 };
 
-// Add this new function to calculate all statistics
 const calculateAllStats = (posts) => {
   const now = new Date();
   const monthAgo = new Date(now.setMonth(now.getMonth() - 1));
   const weekAgo = new Date(now.setDate(now.getDate() - 7));
 
-  // Calculate total words and average word count
-  const totalWords = posts.reduce((sum, post) => {
-    const wordCount = post.content ? post.content.split(/\s+/).filter(word => word.length > 0).length : 0;
-    return sum + wordCount;
+  // Calculate total errors and words
+  const totalErrors = posts.reduce((sum, post) => {
+    return sum + (post.statistics?.overall?.totalErrors || 0);
   }, 0);
+
+  const totalWords = posts.reduce((sum, post) => {
+    return sum + (post.content ? post.content.split(/\s+/).filter(word => word.length > 0).length : 0);
+  }, 0);
+
+  // Calculate error rate as errors per word
+  const errorRate = totalWords > 0 ? totalErrors / totalWords : 0;
+  console.log('Error rate calculation:', { totalErrors, totalWords, errorRate });
 
   // Get the latest post's statistics
   const latestPost = posts[posts.length - 1];
@@ -86,7 +92,7 @@ const calculateAllStats = (posts) => {
       clarity: latestStats.clarity || 0,
       complexity: latestStats.complexity || 0,
       activeVoice: latestStats.activeVoice || 0,
-      errorRate: latestStats.errorRate || 0
+      errorRate: errorRate // Updated error rate calculation
     },
     improvement: {
       errorReduction: calculateOverallProgress(posts).errorReduction,
@@ -96,9 +102,15 @@ const calculateAllStats = (posts) => {
       activeVoiceImprovement: calculateOverallProgress(posts).activeVoiceIncrease
     },
     topPerformance: {
-      bestClarityScore: Math.max(...posts.map(p => p.statistics?.writingMetrics?.clarity || 0)),
-      lowestErrorCount: Math.min(...posts.map(p => p.statistics?.writingMetrics?.errorRate || 0)),
-      highestActiveVoice: Math.max(...posts.map(p => p.statistics?.writingMetrics?.activeVoice || 0))
+      bestClarityScore: Math.max(...posts.map(p => 
+        p.statistics?.writingMetrics?.clarity || 0
+      )),
+      lowestErrorCount: Math.min(...posts.map(p => 
+        p.statistics?.writingMetrics?.errorRate || Number.MAX_VALUE
+      )),
+      highestActiveVoice: Math.max(...posts.map(p => 
+        p.statistics?.writingMetrics?.activeVoice || 0
+      ))
     }
   };
 };
@@ -181,13 +193,20 @@ const saveErrorStats = async (req, res) => {
       return res.status(404).json({ message: 'Post not found' });
     }
 
+    // Calculate word count for error rate
+    const section = post.sections.find(s => s.id === sectionId);
+    const wordCount = section?.content ? 
+      section.content.split(/\s+/).filter(word => word.length > 0).length : 0;
+
     const newErrorStats = {
       sectionId,
       sectionType,
       timestamp: new Date(),
       totalErrors: totalErrors || 0,
       errorsByCategory: errorsByCategory || {},
-      detailedErrors: detailedErrors || []
+      detailedErrors: detailedErrors || [],
+      wordCount,
+      errorRate: wordCount > 0 ? (totalErrors || 0) / wordCount : 0
     };
 
     if (!post.statistics) {
@@ -201,265 +220,6 @@ const saveErrorStats = async (req, res) => {
   } catch (error) {
     console.error('Error saving error stats:', error);
     res.status(500).json({ message: 'Error saving error stats' });
-  }
-};
-
-const testAnalysisEndpoint = async (req, res) => {
-  try {
-    const token = req.headers.authorization;
-    console.log('Test endpoint hit with auth:', token ? 'Token present' : 'No token');
-    
-    res.json({
-      message: 'Analysis endpoint test successful',
-      auth: {
-        hasToken: !!token,
-        userId: req.user?.id
-      },
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Test endpoint error:', error);
-    res.status(500).json({ message: 'Test endpoint error', error: error.message });
-  }
-};
-
-const getConclusionAnalysis = async (req, res) => {
-  try {
-    const userId = req.user.id;
-    // Get the latest post without filtering
-    const post = await Post.findOne({ userId }).sort({ createdAt: -1 });
-
-    // Even if no post is found, return default analysis instead of 404
-    const analysis = {
-      tone: {
-        type: "Formal",
-        confidence: 85,
-        characteristics: ["Professional", "Academic"]
-      },
-      voice: {
-        type: "Active",
-        activeVoicePercentage: 75,
-        passiveVoiceInstances: 5
-      },
-      clarity: {
-        score: 90,
-        level: "High",
-        strengths: ["Clear structure", "Coherent flow"],
-        improvements: ["Reduce sentence length"]
-      },
-      complexity: {
-        sentenceStructure: {
-          score: 85,
-          averageLength: 15,
-          varietyScore: 80
-        },
-        wordChoice: {
-          complexWordsPercentage: 20,
-          academicVocabularyScore: 85
-        },
-        paragraphCohesion: {
-          score: 88,
-          transitionStrength: "Strong",
-          logicalFlowScore: 90
-        }
-      }
-    };
-
-    // Always return 200 status with analysis
-    res.json(analysis);
-  } catch (error) {
-    console.error('Error getting conclusion analysis:', error);
-    // Still return default analysis on error
-    res.json({
-      tone: { type: "Formal", confidence: 85, characteristics: ["Professional", "Academic"] },
-      voice: { type: "Active", activeVoicePercentage: 75, passiveVoiceInstances: 5 },
-      clarity: {
-        score: 90,
-        level: "High",
-        strengths: ["Clear structure", "Coherent flow"],
-        improvements: ["Reduce sentence length"]
-      },
-      complexity: {
-        sentenceStructure: { score: 85, averageLength: 15, varietyScore: 80 },
-        wordChoice: { complexWordsPercentage: 20, academicVocabularyScore: 85 },
-        paragraphCohesion: { score: 88, transitionStrength: "Strong", logicalFlowScore: 90 }
-      }
-    });
-  }
-};
-
-const getBodyAnalysis = async (req, res) => {
-  try {
-    const { timestamp } = req.params;
-    const userId = req.user.id;
-    
-    // Return default analysis rather than 404
-    const analysis = {
-      tone: {
-        type: "Formal",
-        confidence: 85,
-        characteristics: ["Professional", "Academic"]
-      },
-      voice: {
-        type: "Active",
-        activeVoicePercentage: 75,
-        passiveVoiceInstances: 5
-      },
-      clarity: {
-        score: 90,
-        level: "High",
-        strengths: ["Clear structure", "Coherent flow"],
-        improvements: ["Reduce sentence length"]
-      },
-      complexity: {
-        sentenceStructure: {
-          score: 85,
-          averageLength: 15,
-          varietyScore: 80
-        },
-        wordChoice: {
-          complexWordsPercentage: 20,
-          academicVocabularyScore: 85
-        },
-        paragraphCohesion: {
-          score: 88,
-          transitionStrength: "Strong",
-          logicalFlowScore: 90
-        }
-      }
-    };
-
-    // Always return 200 status with analysis
-    res.json(analysis);
-  } catch (error) {
-    console.error('Error getting body analysis:', error);
-    // Still return default analysis on error
-    res.json({
-      tone: { type: "Formal", confidence: 85, characteristics: ["Professional", "Academic"] },
-      voice: { type: "Active", activeVoicePercentage: 75, passiveVoiceInstances: 5 },
-      clarity: {
-        score: 90,
-        level: "High",
-        strengths: ["Clear structure", "Coherent flow"],
-        improvements: ["Reduce sentence length"]
-      },
-      complexity: {
-        sentenceStructure: { score: 85, averageLength: 15, varietyScore: 80 },
-        wordChoice: { complexWordsPercentage: 20, academicVocabularyScore: 85 },
-        paragraphCohesion: { score: 88, transitionStrength: "Strong", logicalFlowScore: 90 }
-      }
-    });
-  }
-};
-
-// Add this helper function for consistent analysis structure
-const getDefaultAnalysis = () => ({
-  tone: {
-    type: "Formal",
-    confidence: 85,
-    characteristics: ["Professional", "Academic"]
-  },
-  voice: {
-    type: "Active",
-    activeVoicePercentage: 75,
-    passiveVoiceInstances: 5
-  },
-  clarity: {
-    score: 90,
-    level: "High",
-    strengths: ["Clear structure", "Coherent flow"],
-    improvements: ["Reduce sentence length"]
-  },
-  complexity: {
-    sentenceStructure: {
-      score: 85,
-      averageLength: 15,
-      varietyScore: 80
-    },
-    wordChoice: {
-      complexWordsPercentage: 20,
-      academicVocabularyScore: 85
-    },
-    paragraphCohesion: {
-      score: 88,
-      transitionStrength: "Strong",
-      logicalFlowScore: 90
-    }
-  }
-});
-
-const saveCompletenessStats = async (req, res) => {
-  try {
-    const { sectionId, isComplete, metRequirements, missingRequirements, details } = req.body;
-    const post = await Post.findOne({
-      userId: req.user.id,
-      'sections.id': sectionId
-    });
-
-    if (!post) return res.status(404).json({ message: 'Post not found' });
-
-    const newStats = {
-      sectionId,
-      timestamp: new Date(),
-      isComplete,
-      metRequirements,
-      missingRequirements,
-      details
-    };
-
-    if (!post.statistics) post.statistics = {};
-    if (!post.statistics.completeness) post.statistics.completeness = [];
-
-    post.statistics.completeness.push(newStats);
-    await post.save();
-
-    res.json(newStats);
-  } catch (error) {
-    console.error('Error saving completeness stats:', error);
-    res.status(500).json({ message: 'Error saving completeness stats' });
-  }
-};
-
-const saveWritingAnalysis = async (req, res) => {
-  try {
-    const { sectionId } = req.params;
-    const analysisData = req.body;
-
-    const post = await Post.findOne({
-      userId: req.user.id,
-      'sections.id': sectionId
-    });
-
-    if (!post) return res.status(404).json({ message: 'Post not found' });
-
-    const section = post.sections.find(s => s.id === sectionId);
-    if (!section) return res.status(404).json({ message: 'Section not found' });
-
-    // Calculate writing metrics
-    const writingMetrics = {
-      clarity: analysisData.clarity?.score || 0,
-      complexity: analysisData.complexity?.sentenceStructure?.score || 0,
-      activeVoice: analysisData.voice?.activeVoicePercentage || 0,
-      errorRate: (analysisData.errors?.length || 0) / (section.content?.split(/\s+/).length || 1) * 100,
-      completionRate: analysisData.completionStatus?.completionRate || 0
-    };
-
-    // Save both the raw analysis and the metrics
-    section.statistics = {
-      ...section.statistics,
-      ...analysisData,
-      writingMetrics
-    };
-
-    // Update post's overall statistics
-    if (!post.statistics) post.statistics = {};
-    post.statistics.writingMetrics = writingMetrics;
-
-    await post.save();
-    res.json(section.statistics);
-  } catch (error) {
-    console.error('Error saving writing analysis:', error);
-    res.status(500).json({ message: 'Error saving writing analysis' });
   }
 };
 
@@ -501,8 +261,9 @@ const getWritingStats = async (req, res) => {
       });
     }
 
-    // Calculate metrics
+    // Calculate metrics with word-based error rate
     const stats = calculateAllStats(userPosts);
+    console.log('Calculated writing stats:', stats); // Add logging
     res.json(stats);
   } catch (error) {
     console.error('Error getting writing stats:', error);
@@ -510,35 +271,9 @@ const getWritingStats = async (req, res) => {
   }
 };
 
-const getWritingAnalysis = async (req, res) => {
-  try {
-    const { sectionId } = req.params;
-    const post = await Post.findOne({
-      userId: req.user.id,
-      'sections.id': sectionId
-    });
-
-    if (!post) return res.status(404).json({ message: 'Post not found' });
-    
-    const section = post.sections.find(s => s.id === sectionId);
-    if (!section) return res.status(404).json({ message: 'Section not found' });
-
-    res.json(getDefaultAnalysis());
-  } catch (error) {
-    console.error('Error getting writing analysis:', error);
-    res.status(500).json({ message: 'Error getting writing analysis' });
-  }
-};
-
 module.exports = {
   getMonthlyStats,
   getErrorStats,
   saveErrorStats,
-  saveCompletenessStats,
-  getWritingStats,
-  getWritingAnalysis,
-  getConclusionAnalysis,
-  getBodyAnalysis,
-  saveWritingAnalysis,
-  testAnalysisEndpoint
+  getWritingStats
 };
