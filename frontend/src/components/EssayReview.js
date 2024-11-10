@@ -1,14 +1,12 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   HomeIcon, 
   ChatAlt2Icon, 
-  PaperAirplaneIcon,
-  ChartBarIcon,
-  XIcon
+  PaperAirplaneIcon 
 } from '@heroicons/react/solid';
 import { AuthContext } from '../context/AuthContext';
-import EssayReviewStats from './EssayReviewStats';
+import WritingAssistant from '../components/WritingAssistant';
 import api from '../services/api';
 
 export const EssayReview = () => {
@@ -16,131 +14,100 @@ export const EssayReview = () => {
   const navigate = useNavigate();
   const { auth } = useContext(AuthContext);
   const { allSections, essayInfo } = location.state || {};
-  
   const [isPosting, setIsPosting] = useState(false);
-  const [showStats, setShowStats] = useState(true);
-  const [postingError, setPostingError] = useState(null);
-  const [loadingStats, setLoadingStats] = useState(true);
-  
+  const [showWritingAssistant, setShowWritingAssistant] = useState(false);
 
   const fullEssayContent = allSections
     ?.map(section => localStorage.getItem(`essayContent_${section.id}`))
     .filter(Boolean)
     .join('\n\n');
 
-    useEffect(() => {
-      const loadStoredStats = () => {
-        try {
-          // Check if all sections have writing style analysis
-          const hasAllStats = allSections?.every(section => 
-            localStorage.getItem(`writingStyle_${section.id}`)
-          );
-          
-          if (!hasAllStats) {
-            console.warn('Some sections missing writing analysis');
-          }
-          
-          setLoadingStats(false);
-        } catch (error) {
-          console.error('Error loading writing stats:', error);
-          setLoadingStats(false);
-        }
-      };
-    
-      loadStoredStats();
-    }, [allSections]);
-
-  const handlePost = async () => {
-    if (!auth?.token) {
-      alert('Please log in to post your essay');
-      navigate('/login', { state: { from: location } });
-      return;
-    }
-
-    if (!fullEssayContent) {
-      setPostingError('Cannot post empty essay');
-      return;
-    }
-
-    if (!essayInfo?.title || !essayInfo?.postType) {
-      setPostingError('Missing required essay information');
-      return;
-    }
-
-    try {
-      setIsPosting(true);
-      setPostingError(null);
-      
-      const postData = {
-        title: essayInfo.title,
-        content: fullEssayContent,
-        postType: essayInfo.postType,
-        prompt: essayInfo.promptId || null,
-        sections: allSections.map(section => ({
-          title: section.title,
-          content: localStorage.getItem(`essayContent_${section.id}`) || '',
-          order: section.order
-        })),
-        statistics: {
-          wordCount: fullEssayContent.split(/\s+/).length,
-          completionTime: new Date() - new Date(essayInfo.startTime),
-          sectionStats: allSections.map(section => ({
-            sectionId: section.id,
-            errors: JSON.parse(localStorage.getItem(`sectionErrors_${section.id}`) || '[]'),
-            requirements: JSON.parse(localStorage.getItem(`sectionRequirements_${section.id}`) || '{}')
-          }))
-        }
-      };
-
-      const response = await api.post('/posts', postData);
-
-      if (response.data) {
-        // Clear ALL related data from localStorage
-        const keys = Object.keys(localStorage);
-        keys.forEach(key => {
-          if (
-            key.startsWith('essayContent_') ||
-            key.startsWith('sectionRequirements_') ||
-            key.startsWith('sectionErrors_') ||
-            key === 'essaySections' ||
-            key === 'essayInfo' ||
-            key.startsWith('essay_') ||
-            key.includes('section')
-          ) {
-            localStorage.removeItem(key);
-          }
-        });
-
-        // Navigate to success page
-        navigate('/home', { 
-          replace: true,
-          state: { 
-            message: 'Essay posted successfully!',
-            essayId: response.data._id
-          }
-        });
-      }
-    } catch (error) {
-      if (error.response?.status === 401) {
-        setPostingError('Your session has expired. Please log in again.');
+    const handlePost = async () => {
+      if (!auth?.token) {
+        alert('Please log in to post your essay');
         navigate('/login', { state: { from: location } });
-      } else if (error.response?.status === 400) {
-        setPostingError(error.response.data.message || 'Invalid essay data. Please check all fields.');
-      } else if (error.response?.status === 413) {
-        setPostingError('Essay content is too large. Please try shortening it.');
-      } else {
-        setPostingError('Failed to post essay. Please try again later.');
+        return;
       }
-    } finally {
-      setIsPosting(false);
-    }
-  };
+    
+      if (!fullEssayContent) {
+        alert('Cannot post empty essay');
+        return;
+      }
+    
+      if (!essayInfo?.title || !essayInfo?.postType) {
+        alert('Missing required essay information');
+        return;
+      }
+    
+      try {
+        setIsPosting(true);
+        
+        const postData = {
+          title: essayInfo.title,
+          content: fullEssayContent,
+          postType: essayInfo.postType,
+          prompt: essayInfo.promptId || null
+        };
+    
+        const response = await api.post('/posts', postData);
+    
+        if (response.data) {
+          // Clear ALL related data from localStorage
+          const keys = Object.keys(localStorage);
+          keys.forEach(key => {
+            // Clear essay content
+            if (key.startsWith('essayContent_')) {
+              localStorage.removeItem(key);
+            }
+            // Clear requirements
+            if (key.startsWith('sectionRequirements_')) {
+              localStorage.removeItem(key);
+            }
+            // Clear essay sections and info
+            if (key === 'essaySections' || key === 'essayInfo') {
+              localStorage.removeItem(key);
+            }
+            // Clear any other essay-related data
+            if (key.startsWith('essay_') || key.includes('section')) {
+              localStorage.removeItem(key);
+            }
+          });
+    
+          // First navigate to essay builder with null state to reset its state
+          navigate('/essaybuilder', { 
+            replace: true, 
+            state: null
+          });
+    
+          // Then navigate to home with success message
+          navigate('/home', { 
+            replace: true,
+            state: { message: 'Essay posted successfully!' }
+          });
+        }
+      } catch (error) {
+        if (error.response?.status === 401) {
+          alert('Your session has expired. Please log in again.');
+          navigate('/login', { state: { from: location } });
+        } else if (error.response?.status === 400) {
+          alert(error.response.data.message || 'Invalid essay data. Please check all fields.');
+        } else if (error.response?.status === 413) {
+          alert('Essay content is too large. Please try shortening it.');
+        } else {
+          alert('Failed to post essay. Please try again later.');
+        }
+      } finally {
+        setIsPosting(false);
+      }
+    };
+
+
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 p-4 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
+      <div className="flex flex-col">
+        {/* Header */}
+        <header className="bg-white border-b border-gray-200 p-4 flex justify-between items-center">
           <div className="flex items-center space-x-4">
             <button 
               onClick={() => navigate('/essaybuilder')} 
@@ -148,32 +115,19 @@ export const EssayReview = () => {
             >
               <HomeIcon className="text-white h-6 w-6" />
             </button>
-            <h1 className="text-2xl font-semibold truncate max-w-md">
-              {essayInfo?.title}
-            </h1>
+            <h1 className="text-2xl font-semibold">{essayInfo?.title}</h1>
           </div>
-          
           <div className="flex items-center space-x-4">
-            <button
-              onClick={() => setShowStats(!showStats)}
-              className={`p-2 rounded-full transition-colors ${
-                showStats ? 'bg-purple-100 text-purple-600' : 'text-gray-600 hover:text-purple-600'
-              }`}
-            >
-              <ChartBarIcon className="h-6 w-6" />
-            </button>
             <button
               onClick={handlePost}
               disabled={isPosting}
-              className="bg-green-600 text-white px-6 py-2 rounded-full flex items-center space-x-2 
-                hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-green-600 text-white px-6 py-2 rounded-full flex items-center disabled:opacity-50"
             >
-              <PaperAirplaneIcon className="h-5 w-5" />
-              <span>{isPosting ? 'Posting...' : 'Post Essay'}</span>
+              <PaperAirplaneIcon className="h-5 w-5 mr-2" />
+              {isPosting ? 'Posting...' : 'Post Essay'}
             </button>
           </div>
-        </div>
-      </header>
+        </header>
 
       {/* Error Message */}
       {postingError && (
@@ -215,10 +169,8 @@ export const EssayReview = () => {
               <div className="prose max-w-none">
                 {allSections?.map((section, index) => (
                   <div key={section.id} className="mb-8">
-                    <h3 className="text-xl font-semibold text-gray-800 mb-4">
-                      {section.title}
-                    </h3>
-                    <div className="text-gray-700 whitespace-pre-wrap leading-relaxed">
+                    <h2 className="text-xl font-semibold mb-4">{section.title}</h2>
+                    <div className="whitespace-pre-wrap">
                       {localStorage.getItem(`essayContent_${section.id}`)}
                     </div>
                   </div>
@@ -226,10 +178,16 @@ export const EssayReview = () => {
               </div>
             </div>
           </div>
-        </div>
-      </main>
+        </main>
+      </div>
+
+      {/* Writing Assistant Modal */}
+      <WritingAssistant 
+        isOpen={showWritingAssistant}
+        onClose={() => setShowWritingAssistant(false)}
+        content={fullEssayContent}
+        essayInfo={essayInfo}
+      />
     </div>
   );
 };
-
-export default EssayReview;
