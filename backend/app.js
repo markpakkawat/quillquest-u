@@ -62,21 +62,14 @@ const resetPasswordRoute = require('./routes/resetPassword');
 const statisticsRoutes = require('./routes/statistics');
 
 // 6. Apply Routes
-// In app.js, modify the route mounting section to properly nest statistics routes
-
-const express = require('express');
-// ... other imports remain the same ...
-
-// Update route mounting section
 app.use('/api/auth', authRoutes, resetPasswordRoute);
 app.use('/api/users', userRoutes);
-app.use('/api/users', statisticsRoutes); // Move statistics under /api/users
 app.use('/api/posts', postRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/prompts', promptRoutes);
 app.use('/api', replyRoutes);
 app.use('/api/notifications', notificationRoutes);
-app.use('/api/statistics', require('./routes/statistics'));
+app.use('/api/statistics', statisticsRoutes);
 
 // 7. Test Route
 app.get('/api/test', (req, res) => {

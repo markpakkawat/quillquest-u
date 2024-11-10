@@ -1,23 +1,7 @@
 import axios from 'axios';
 import { logout } from '../context/AuthContext.js';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001/api';
-
-// API route configuration
-export const API_ROUTES = {
-  statistics: {
-    base: '/statistics',
-    analysis: {
-      conclusion: '/statistics/analysis/conclusion',
-      body: (timestamp) => `/statistics/analysis/body-${timestamp}`,
-      section: (id) => `/statistics/analysis/${id}`,
-    },
-    errors: '/statistics/errors',
-    completeness: '/statistics/completeness',
-    monthly: '/statistics/monthly',
-    writingStats: '/statistics/writing-stats'
-  }
-};
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -37,26 +21,12 @@ const logWithDetails = (type, data) => {
   });
 };
 
-// Request retry configuration
-const RETRY_CONFIG = {
-  maxRetries: 3,
-  initialDelay: 1000,
-  maxDelay: 10000,
-  backoffFactor: 2
-};
-
-// Calculate exponential backoff delay
-const getRetryDelay = (retryCount) => {
-  const delay = RETRY_CONFIG.initialDelay * 
-    Math.pow(RETRY_CONFIG.backoffFactor, retryCount);
-  return Math.min(delay, RETRY_CONFIG.maxDelay);
-};
-
-// Request Interceptor
+// Request Interceptor with enhanced logging
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     
+    // Enhanced request logging
     logWithDetails('Request Details', {
       url: `${config.baseURL}${config.url}`,
       method: config.method?.toUpperCase(),
@@ -64,7 +34,7 @@ api.interceptors.request.use(
         ...config.headers,
         Authorization: token ? 'Bearer [REDACTED]' : 'None'
       },
-      data: config.data ? 'No data' : null,
+      data: config.data ? JSON.stringify(config.data) : 'No data',
       timestamp: new Date().toISOString()
     });
 
@@ -84,127 +54,124 @@ api.interceptors.request.use(
   }
 );
 
-// Response Interceptor
+// Response Interceptor with enhanced error handling
 api.interceptors.response.use(
   (response) => {
     logWithDetails('Successful Response', {
       url: response.config.url,
       status: response.status,
       statusText: response.statusText,
-      data: response.data ? 'Data received' : 'No data',
+      headers: response.headers,
+      data: response.data ? JSON.stringify(response.data) : 'No data',
       timestamp: new Date().toISOString()
     });
     return response;
   },
-  async (error) => {
-    const originalRequest = error.config;
-    const retryCount = originalRequest._retryCount || 0;
-
+  (error) => {
     const errorDetails = {
-      url: originalRequest?.url,
-      method: originalRequest?.method?.toUpperCase(),
+      url: error.config?.url,
+      method: error.config?.method?.toUpperCase(),
+      requestData: error.config?.data,
       message: error.message,
       status: error.response?.status,
       statusText: error.response?.statusText,
-      timestamp: new Date().toISOString(),
-      retryCount
+      responseData: error.response?.data,
+      timestamp: new Date().toISOString()
     };
 
-    // Handle different error types
     if (error.code === 'ECONNABORTED') {
       logWithDetails('Timeout Error', {
         ...errorDetails,
-        timeout: originalRequest?.timeout
+        timeout: error.config?.timeout
       });
-      console.error('Request timed out');
-    } else if (!error.response) {
-      logWithDetails('Network Error', errorDetails);
-    } else {
-      // Handle specific HTTP errors
-      switch (error.response.status) {
-        case 401:
-          logWithDetails('Authentication Error', errorDetails);
-          localStorage.removeItem('token');
-          logout(); // Call the imported logout function
-          break;
-
-        case 403:
-          logWithDetails('Authorization Error', errorDetails);
-          break;
-
-        case 404:
-          logWithDetails('Resource Not Found', {
-            ...errorDetails,
-            path: originalRequest?.url
-          });
-          break;
-
-        case 429:
-          logWithDetails('Rate Limit Error', errorDetails);
-          if (retryCount < RETRY_CONFIG.maxRetries) {
-            const delay = getRetryDelay(retryCount);
-            await new Promise(resolve => setTimeout(resolve, delay));
-            originalRequest._retryCount = retryCount + 1;
-            return api(originalRequest);
-          }
-          break;
-
-        case 500:
-          logWithDetails('Server Error', {
-            ...errorDetails,
-            serverMessage: error.response?.data?.message
-          });
-          break;
-
-        default:
-          logWithDetails('API Error', errorDetails);
-      }
+      return Promise.reject({
+        ...error,
+        customMessage: `Request timed out after ${error.config?.timeout}ms. Please try again.`
+      });
     }
 
-    return Promise.reject(error);
+    if (!error.response) {
+      logWithDetails('Network Error', errorDetails);
+      return Promise.reject({
+        ...error,
+        customMessage: 'Network error. Please check your connection.'
+      });
+    }
+
+    // Enhanced error logging based on status
+    switch (error.response.status) {
+      case 401:
+        logWithDetails('Authentication Error', {
+          ...errorDetails,
+          token: localStorage.getItem('token') ? 'Present' : 'Missing'
+        });
+        localStorage.removeItem('token');
+        break;
+        
+      case 403:
+        logWithDetails('Authorization Error', errorDetails);
+        break;
+        
+      case 404:
+        logWithDetails('Resource Not Found', {
+          ...errorDetails,
+          path: error.config?.url
+        });
+        break;
+        
+      case 500:
+        logWithDetails('Server Error', {
+          ...errorDetails,
+          serverMessage: error.response?.data?.message,
+          serverStack: error.response?.data?.stack
+        });
+        break;
+        
+      default:
+        logWithDetails('API Error', errorDetails);
+    }
+
+    // Enhanced error details
+    const customError = {
+      ...error,
+      customMessage: error.response?.data?.message || 'An error occurred. Please try again.',
+      details: error.response?.data?.details,
+      timestamp: new Date().toISOString()
+    };
+
+    return Promise.reject(customError);
   }
 );
 
-// Writing analysis specific methods
-api.writingAnalysis = {
-  getConclusion: () => 
-    api.get(API_ROUTES.statistics.analysis.conclusion),
-  
-  getBody: (timestamp) => 
-    api.get(API_ROUTES.statistics.analysis.body(timestamp)),
-  
-  getSection: (sectionId) => 
-    api.get(API_ROUTES.statistics.analysis.section(sectionId)),
-  
-  save: (sectionId, data) => 
-    api.post(API_ROUTES.statistics.analysis.section(sectionId), data)
-};
-
-// Statistics specific methods
-api.statistics = {
-  getErrors: () => 
-    api.get(API_ROUTES.statistics.errors),
-  
-  saveErrors: (data) => 
-    api.post(API_ROUTES.statistics.errors, data),
-  
-  getMonthly: () => 
-    api.get(API_ROUTES.statistics.monthly),
-  
-  saveCompleteness: (data) => 
-    api.post(API_ROUTES.statistics.completeness, data),
-  
-  getWritingStats: () => 
-    api.get(API_ROUTES.statistics.writingStats)
-};
-
-// Utility methods
+// Utility methods remain the same
 api.isSuccess = (status) => status >= 200 && status < 300;
 api.isError = (status) => status >= 400;
 api.isServerError = (status) => status >= 500;
-api.isRetryable = (error) => {
-  if (!error.response) return true;
-  return error.response.status >= 500 || error.response.status === 429;
+
+// Enhanced retry mechanism with logging
+api.retryRequest = async (config, maxRetries = 3, delay = 1000) => {
+  let retries = 0;
+  while (retries < maxRetries) {
+    try {
+      logWithDetails('Retry Attempt', {
+        attempt: retries + 1,
+        maxRetries,
+        delay: delay * (retries + 1),
+        endpoint: config.url
+      });
+      return await api(config);
+    } catch (error) {
+      retries++;
+      logWithDetails('Retry Failed', {
+        attempt: retries,
+        maxRetries,
+        error: error.message,
+        willRetry: retries < maxRetries
+      });
+      if (retries === maxRetries) throw error;
+      await new Promise(resolve => setTimeout(resolve, delay * retries));
+    }
+  }
 };
 
 export default api;

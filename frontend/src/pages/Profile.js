@@ -5,7 +5,6 @@ import api from '../services/api';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { Link } from 'react-router-dom';
 import UserStatistics from '../components/UserStatistics';
-import { analyzeWritingStyle } from '../utils/writing/writingAnalysis';
 
 const Notification = ({ message, type, onClose }) => {
   if (!message) return null;
@@ -43,30 +42,21 @@ const Profile = () => {
     historical: null
   });
 
+
   const fetchStatistics = async () => {
     try {
       const essaySections = JSON.parse(localStorage.getItem('essaySections') || '[]');
       const errorStats = JSON.parse(localStorage.getItem('errorStats') || '[]');
       const completenessStats = JSON.parse(localStorage.getItem('completenessStats') || '[]');
-
+  
       const token = localStorage.getItem('token');
-      const writingStatsResponse = await api.get('/users/writing-stats', {
+      const response = await api.get('/users/writing-stats', {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-
-      const latestPost = userPosts[0];
-      let latestPostAnalysis = null;
-
-      if (latestPost?.content) {
-        try {
-          latestPostAnalysis = await analyzeWritingStyle(latestPost.content);
-        } catch (error) {
-          console.warn('Error analyzing latest post:', error);
-        }
-      }
-
+  
+      // Calculate current session stats
       const currentSessionStats = {
         essaySections,
         errorStats,
@@ -84,41 +74,23 @@ const Profile = () => {
             : 0
         }
       };
-
+  
+      // Calculate error stats if available
       if (errorStats.length > 0) {
-        currentSessionStats.totalErrors = errorStats.reduce((sum, stat) => 
-          sum + (stat.totalErrors || 0), 0
-        );
-        
+        currentSessionStats.totalErrors = errorStats.reduce((sum, stat) => sum + (stat.totalErrors || 0), 0);
         errorStats.forEach(stat => {
           if (stat.errorsByCategory) {
             Object.entries(stat.errorsByCategory).forEach(([category, count]) => {
-              currentSessionStats.currentErrors[category] = 
-                (currentSessionStats.currentErrors[category] || 0) + count;
+              currentSessionStats.currentErrors[category] = (currentSessionStats.currentErrors[category] || 0) + count;
             });
           }
         });
       }
-
-      const historicalData = {
-        ...writingStatsResponse.data,
-        qualityMetrics: {
-          ...writingStatsResponse.data.qualityMetrics,
-          ...(latestPostAnalysis && {
-            clarity: latestPostAnalysis.clarity.score,
-            complexity: latestPostAnalysis.complexity.sentenceStructure.score,
-            activeVoice: latestPostAnalysis.voice.activeVoicePercentage,
-            errorRate: currentSessionStats.totalErrors / (essaySections.length || 1)
-          })
-        },
-        writingStyle: latestPostAnalysis
-      };
-
+  
       setStatisticsData({
         currentSession: currentSessionStats,
-        historical: historicalData
+        historical: response.data
       });
-
     } catch (error) {
       console.error('Error fetching statistics:', error);
       setStatisticsData({
@@ -137,14 +109,7 @@ const Profile = () => {
             completionRate: 0
           }
         },
-        historical: {
-          qualityMetrics: {
-            clarity: 0,
-            complexity: 0,
-            activeVoice: 0,
-            errorRate: 0
-          }
-        }
+        historical: null
       });
     }
   };
@@ -175,35 +140,19 @@ const Profile = () => {
           Authorization: `Bearer ${token}`,
         },
       });
-  
-      const sortedPosts = response.data.sort((a, b) => 
-        new Date(b.createdAt) - new Date(a.createdAt)
-      );
-  
-      const likesCount = sortedPosts.reduce((acc, post) => 
-        acc + (post.likes?.length || 0), 0
-      );
-  
-      const wordCount = sortedPosts.reduce((acc, post) => 
-        acc + (post.content ? post.content.split(' ').length : 0), 0
-      );
-  
-      const avgWords = sortedPosts.length > 0 ? 
-        Math.round(wordCount / sortedPosts.length) : 0;
-  
-      setUserPosts(sortedPosts);
-      setPostsCount(sortedPosts.length);
-      setTotalLikes(likesCount);
-      setAvgWordCount(avgWords);
-  
-      return sortedPosts;
+      let userPosts = response.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setUserPosts(userPosts);
+      setPostsCount(userPosts.length);
+
+      const totalLikesCount = userPosts.reduce((acc, post) => acc + (post.likes ? post.likes.length : 0), 0);
+      setTotalLikes(totalLikesCount);
+
+      const totalWords = userPosts.reduce((acc, post) => acc + (post.content ? post.content.split(' ').length : 0), 0);
+      const averageWordCount = userPosts.length > 0 ? Math.round(totalWords / userPosts.length) : 0;
+      setAvgWordCount(averageWordCount);
     } catch (err) {
       console.error('Error fetching posts data:', err);
-      setUserPosts([]);
-      setPostsCount(0);
-      setTotalLikes(0);
-      setAvgWordCount(0);
-      return [];
+      throw err;
     }
   };
 
@@ -223,7 +172,7 @@ const Profile = () => {
         setIsLoading(false);
       }
     };
-  
+
     fetchAllData();
   }, []);
 
@@ -372,19 +321,7 @@ const Profile = () => {
         </div>
         
         <UserStatistics 
-          statistics={{
-            ...statisticsData.historical,
-            qualityMetrics: statisticsData.historical?.qualityMetrics || {
-              clarity: 0,
-              complexity: 0,
-              activeVoice: 0,
-              errorRate: 0
-            },
-            recentActivity: {
-              completedPosts: userPosts.filter(post => post.isComplete).length || 0
-            },
-            writingStyle: statisticsData.historical?.writingStyle
-          }}
+          statistics={statisticsData.currentSession}
           postsCount={postsCount}
           avgWordCount={avgWordCount}
           loading={isLoading}
