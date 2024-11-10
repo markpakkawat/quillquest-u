@@ -95,18 +95,28 @@ const Profile = () => {
       const essaySections = JSON.parse(localStorage.getItem('essaySections') || '[]');
       const errorStats = JSON.parse(localStorage.getItem('errorStats') || '[]');
       const completenessStats = JSON.parse(localStorage.getItem('completenessStats') || '[]');
-  
-      const writingStatsResponse = await api.statistics.getWritingStats();
-      console.log('Received writing stats:', writingStatsResponse.data);
-  
-      // Calculate error rate from local data
-      const totalErrors = errorStats.reduce((sum, stat) => sum + (stat.totalErrors || 0), 0);
-      const errorRate = essaySections.length ? totalErrors / essaySections.length : 0;
-      console.log('Local error stats:', { totalErrors, essaySections: essaySections.length, errorRate });
-  
+
+      console.log('Local stats:', {
+        sections: essaySections.length,
+        errors: errorStats,
+        completeness: completenessStats
+      });
+
+      const token = localStorage.getItem('token');
+      let writingStatsResponse;
+      try {
+        writingStatsResponse = await api.get('/users/statistics/writing-stats', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        console.log('API writing stats response:', writingStatsResponse.data);
+      } catch (apiError) {
+        console.warn('Failed to fetch writing stats from API:', apiError);
+        writingStatsResponse = { data: null };
+      }
+
       const latestPost = userPosts[0];
       let latestPostAnalysis = null;
-  
+
       if (latestPost?.content) {
         try {
           latestPostAnalysis = await analyzeWritingStyle(latestPost.content);
@@ -115,13 +125,13 @@ const Profile = () => {
           console.warn('Error analyzing latest post:', error);
         }
       }
-  
+
       const currentSessionStats = {
         essaySections,
         errorStats,
         completenessStats,
         currentErrors: {},
-        totalErrors,
+        totalErrors: 0,
         errorTrends: [],
         sectionRates: {},
         commonMissingRequirements: [],
@@ -133,45 +143,50 @@ const Profile = () => {
             : 0
         }
       };
-  
-      // Calculate current errors by category
-      errorStats.forEach(stat => {
-        if (stat.errorsByCategory) {
-          Object.entries(stat.errorsByCategory).forEach(([category, count]) => {
-            currentSessionStats.currentErrors[category] = 
-              (currentSessionStats.currentErrors[category] || 0) + count;
-          });
-        }
-      });
-  
+
+      // Calculate error statistics
+      if (errorStats.length > 0) {
+        currentSessionStats.totalErrors = errorStats.reduce((sum, stat) => 
+          sum + (stat.totalErrors || 0), 0
+        );
+        
+        // Process errors by category
+        errorStats.forEach(stat => {
+          if (stat.errorsByCategory) {
+            Object.entries(stat.errorsByCategory).forEach(([category, count]) => {
+              currentSessionStats.currentErrors[category] = 
+                (currentSessionStats.currentErrors[category] || 0) + count;
+            });
+          }
+        });
+      }
+
       const historicalData = {
-        ...writingStatsResponse.data,
+        ...writingStatsResponse?.data,
         qualityMetrics: {
-          ...writingStatsResponse.data.qualityMetrics,
+          ...(writingStatsResponse?.data?.qualityMetrics || {}),
           ...(latestPostAnalysis && {
-            clarity: latestPostAnalysis.clarity.score,
-            complexity: latestPostAnalysis.complexity.sentenceStructure.score,
-            activeVoice: latestPostAnalysis.voice.activeVoicePercentage
-          }),
-          errorRate: errorRate // Use calculated error rate
+            clarity: latestPostAnalysis.clarity?.score || 0,
+            complexity: latestPostAnalysis.complexity?.sentenceStructure?.score || 0,
+            activeVoice: latestPostAnalysis.voice?.activeVoicePercentage || 0,
+            errorRate: currentSessionStats.totalErrors / Math.max(1, errorStats.length)
+          })
         },
-        writingStyle: latestPostAnalysis
+        writingStyle: latestPostAnalysis,
+        currentErrors: currentSessionStats.currentErrors,
+        completionStatus: currentSessionStats.completionStatus
       };
-  
+
       console.log('Setting statistics data:', {
-        currentSession: {
-          totalErrors,
-          essayCount: essaySections.length,
-          errorRate
-        },
-        qualityMetrics: historicalData.qualityMetrics
+        currentSession: currentSessionStats,
+        historical: historicalData
       });
-  
+
       setStatisticsData({
         currentSession: currentSessionStats,
         historical: historicalData
       });
-  
+
     } catch (error) {
       console.error('Error fetching statistics:', error);
       setStatisticsData({
@@ -238,7 +253,7 @@ const Profile = () => {
       );
   
       const wordCount = sortedPosts.reduce((acc, post) => 
-        acc + (post.content ? post.content.split(' ').length : 0), 0
+        acc + (post.content ? post.content.split(/\s+/).filter(word => word.length > 0).length : 0), 0
       );
   
       const avgWords = sortedPosts.length > 0 ? 
@@ -345,125 +360,136 @@ const Profile = () => {
     return <p className="text-center text-red-500 mt-8">{error}</p>;
   }
 
+// In the return statement of Profile component, wrap the adjacent elements properly:
+
   return (
     <div className="bg-[white] min-h-screen pt-20 pb-5 px-5 flex flex-col items-center">
       <Navbar />
       <div className="w-full max-w-5xl rounded-lg overflow-y-auto p-5">
-        <div className="bg-white shadow-md rounded-lg overflow-hidden">
-          <div className="p-8">
-            <div className="flex flex-col md:flex-row items-center">
-              <div className="flex flex-col md:items-start md:flex-row md:space-x-6 w-full">
-                <div className={`flex-shrink-0 ${avatarColor} w-40 h-40 rounded-full mx-auto md:mx-0`}></div>
-                {isEditing && (
-                  <button
-                    onClick={handleCustomize}
-                    className="w-auto bg-white p-2 rounded-full shadow-md hover:bg-gray-100 mt-4 md:mt-0"
-                    aria-label="Customize avatar"
-                  >
-                    <SettingsIcon className="w-5 h-5 text-gray-600" />
-                  </button>
-                )}
-                <div className="mt-6 md:mt-0 md:ml-8 w-full">
-                  {isEditing ? (
-                    <>
-                      <input
-                        type="text"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        className="bg-gray-50 w-full p-4 border rounded-2xl bg-[#D9D9D9] text-xl mb-4"
-                        placeholder={profileData.username}
-                      />
-                      <div className='flex'>
-                        <p className="text-2xl font-semibold">{profileData.email}</p>
-                      </div>
-                      <Notification
-                        message={notification.message}
-                        type={notification.type}
-                        onClose={() => setNotification({ message: '', type: '' })}
-                      />
-                    </>
-                  ) : (
-                    <div className='flex-col mt-10 ml-10'>
-                      <div className='flex'>
-                        <p className="text-2xl font-semibold mb-4">{profileData?.username}</p>
-                      </div>
-                      <div className='flex'>
-                        <p className="text-2xl font-semibold">{profileData?.email}</p>
-                      </div>
-                    </div>
+        <div className="space-y-8">  {/* Added wrapper div with spacing */}
+          {/* Profile Section */}
+          <div className="bg-white shadow-md rounded-lg overflow-hidden">
+            <div className="p-8">
+              <div className="flex flex-col md:flex-row items-center">
+                <div className="flex flex-col md:items-start md:flex-row md:space-x-6 w-full">
+                  <div className={`flex-shrink-0 ${avatarColor} w-40 h-40 rounded-full mx-auto md:mx-0`}></div>
+                  {isEditing && (
+                    <button
+                      onClick={handleCustomize}
+                      className="w-auto bg-white p-2 rounded-full shadow-md hover:bg-gray-100 mt-4 md:mt-0"
+                      aria-label="Customize avatar"
+                    >
+                      <SettingsIcon className="w-5 h-5 text-gray-600" />
+                    </button>
                   )}
+                  <div className="mt-6 md:mt-0 md:ml-8 w-full">
+                    {isEditing ? (
+                      <>
+                        <input
+                          type="text"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                          className="bg-gray-50 w-full p-4 border rounded-2xl bg-[#D9D9D9] text-xl mb-4"
+                          placeholder={profileData.username}
+                        />
+                        <div className='flex'>
+                          <p className="text-2xl font-semibold">{profileData.email}</p>
+                        </div>
+                        <Notification
+                          message={notification.message}
+                          type={notification.type}
+                          onClose={() => setNotification({ message: '', type: '' })}
+                        />
+                      </>
+                    ) : (
+                      <div className='flex-col mt-10 ml-10'>
+                        <div className='flex'>
+                          <p className="text-2xl font-semibold mb-4">{profileData?.username}</p>
+                        </div>
+                        <div className='flex'>
+                          <p className="text-2xl font-semibold">{profileData?.email}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="mt-6 flex justify-center md:justify-end">
-              {isEditing ? (
-                <div className='space-x-2'>
+              <div className="mt-6 flex justify-center md:justify-end">
+                {isEditing ? (
+                  <div className='space-x-2'>
+                    <button
+                      onClick={handleCancel}
+                      className="w-auto px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSave}
+                      className={`w-auto px-4 py-2 rounded-xl ${hasChanges ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-gray-300 text-gray-600 cursor-not-allowed'}`}
+                      disabled={!hasChanges}
+                    >
+                      Save Changes
+                    </button>
+                  </div>
+                ) : (
                   <button
-                    onClick={handleCancel}
+                    onClick={() => setIsEditing(true)}
                     className="w-auto px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700"
                   >
-                    Cancel
+                    Edit Profile
                   </button>
-                  <button
-                    onClick={handleSave}
-                    className={`w-auto px-4 py-2 rounded-xl ${hasChanges ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-gray-300 text-gray-600 cursor-not-allowed'}`}
-                    disabled={!hasChanges}
-                  >
-                    Save Changes
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="w-auto px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700"
-                >
-                  Edit Profile
-                </button>
-              )}
+                )}
+              </div>
             </div>
           </div>
-        </div>
-        
-        <UserStatistics 
-          statistics={{
-            ...statisticsData.historical,
-            qualityMetrics: (() => {
-              const metrics = statisticsData.historical?.qualityMetrics || {
-                clarity: 0,
-                complexity: 0,
-                activeVoice: 0,
-                errorRate: 0
-              };
-              console.log('Passing quality metrics to UserStatistics:', metrics);
-              return metrics;
-            })(),
-            recentActivity: {
-              completedPosts: userPosts.filter(post => post.isComplete).length || 0
-            },
-            writingStyle: statisticsData.historical?.writingStyle
-          }}
-          postsCount={postsCount}
-          avgWordCount={avgWordCount}
-          loading={isLoading}
-        />
-        
-        <div className="mt-8">
-          <h3 className="text-2xl font-semibold mb-4">All Posts</h3>
-          {userPosts.length > 0 ? (
-            <div className="space-y-4">
-              {userPosts.map((post) => (
-                <div key={post._id} className="bg-white p-4 rounded-lg shadow">
-                  <Link to={`/posts/${post._id}`} className="text-xl font-bold text-purple-600 mb-2 block hover:underline">
-                    {post.title}
-                  </Link>
-                  <p className="text-sm text-gray-600 mb-1">{new Date(post.createdAt).toLocaleString()}</p>
-                  <div className="max-w-2xl mx-auto p-6 text-justify whitespace-pre-wrap leading-relaxed" dangerouslySetInnerHTML={{ __html: post.content }} />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p>No posts yet.</p>
-          )}
+
+          {/* Statistics Section */}
+          <div className="bg-white shadow-md rounded-lg overflow-hidden">
+            <UserStatistics 
+              statistics={{
+                ...statisticsData.historical,
+                writingStyle: statisticsData.historical?.writingStyle || null,
+                currentErrors: statisticsData.currentSession?.currentErrors,
+                completionStatus: statisticsData.currentSession?.completionStatus,
+                recentActivity: {
+                  completedPosts: userPosts.filter(post => post.isComplete).length || 0,
+                  totalPosts: postsCount,
+                  averageWordCount: avgWordCount
+                }
+              }}
+              postsCount={postsCount}
+              avgWordCount={avgWordCount}
+              loading={isLoading}
+            />
+          </div>
+          
+          {/* Posts Section */}
+          <div className="mt-8">
+            <h3 className="text-2xl font-semibold mb-4">All Posts</h3>
+            {userPosts.length > 0 ? (
+              <div className="space-y-4">
+                {userPosts.map((post) => (
+                  <div key={post._id} className="bg-white p-4 rounded-lg shadow">
+                    <Link 
+                      to={`/posts/${post._id}`} 
+                      className="text-xl font-bold text-purple-600 mb-2 block hover:underline"
+                    >
+                      {post.title}
+                    </Link>
+                    <p className="text-sm text-gray-600 mb-1">
+                      {new Date(post.createdAt).toLocaleString()}
+                    </p>
+                    <div 
+                      className="max-w-2xl mx-auto p-6 text-justify whitespace-pre-wrap leading-relaxed"
+                      dangerouslySetInnerHTML={{ __html: post.content }} 
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p>No posts yet.</p>
+            )}
+          </div>
         </div>
       </div>
     </div>

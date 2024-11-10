@@ -203,7 +203,10 @@ export const EssayReview = () => {
             <div className="bg-white rounded-xl shadow-sm overflow-hidden">
               <div className="p-6">
                 <h2 className="text-lg font-semibold mb-6">Essay Analysis</h2>
-                <EssayReviewStats sections={allSections} />
+                <EssayReviewStats 
+                  sections={allSections}
+                  loading={loadingStats}
+                />
               </div>
             </div>
           )}

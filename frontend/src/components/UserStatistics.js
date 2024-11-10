@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Pencil, 
-  FileText
+  FileText,
 } from "lucide-react";
 import EssayReviewStats from './EssayReviewStats';
 
@@ -18,19 +18,12 @@ const StatCard = ({ icon: Icon, title, value, subtitle }) => (
 );
 
 const UserStatistics = ({ statistics, postsCount, avgWordCount, loading }) => {
-  const [loadingStats, setLoadingStats] = useState(true);
-  const [sections, setSections] = useState([]);
-
-  useEffect(() => {
-    if (statistics?.writingStyle) {
-      setSections([{
-        id: 'latest',
-        type: 'latest',
-        writingAnalysis: statistics.writingStyle
-      }]);
-    }
-    setLoadingStats(false);
-  }, [statistics]);
+  console.log('UserStatistics props:', {
+    statistics,
+    postsCount,
+    avgWordCount,
+    hasWritingStyle: !!statistics?.writingStyle
+  });
 
   if (loading) {
     return (
@@ -59,15 +52,15 @@ const UserStatistics = ({ statistics, postsCount, avgWordCount, loading }) => {
       </div>
 
       {/* Writing Style Analysis */}
-      {sections.length > 0 && statistics.writingStyle && (
-        <div className="bg-white rounded-2xl p-8 shadow-sm">
-          <h3 className="text-lg font-medium mb-6">Writing Analysis</h3>
-          <EssayReviewStats 
-            sections={sections}
-            writingStyle={statistics.writingStyle}
-          />
-        </div>
-      )}
+      <div className="bg-white rounded-2xl p-8 shadow-sm">
+        <h3 className="text-lg font-medium mb-6">Writing Analysis</h3>
+        <EssayReviewStats 
+          sections={[]}
+          writingStyle={statistics?.writingStyle}
+          currentErrors={statistics?.currentErrors}
+          completionStatus={statistics?.completionStatus}
+        />
+      </div>
     </div>
   );
 };
