@@ -53,7 +53,11 @@ api.interceptors.request.use(
     return Promise.reject(error);
   }
 );
+let logoutHandler;
 
+export const setLogoutHandler = (params) => {
+  logoutHandler = logout;
+};
 // Response Interceptor with enhanced error handling
 api.interceptors.response.use(
   (response) => {
