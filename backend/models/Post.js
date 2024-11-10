@@ -17,8 +17,7 @@ const PostSchema = new mongoose.Schema({
   content: {
     type: String,
     required: true
-  }
-  ,
+  },
   likes: [{ 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'User' 
@@ -30,7 +29,8 @@ const PostSchema = new mongoose.Schema({
   },
   prompt: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Prompt'
+    ref: 'Prompt',
+    default: null
   },
   createdAt: {
     type: Date,
@@ -40,6 +40,13 @@ const PostSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Comment'
   }]
+}, {
+  strictPopulate: false // Allow flexible population
 });
+
+// Ensure indexes for better query performance
+PostSchema.index({ createdAt: -1 });
+PostSchema.index({ userId: 1 });
+PostSchema.index({ postType: 1 });
 
 module.exports = mongoose.model('Post', PostSchema);

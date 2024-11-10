@@ -1,9 +1,8 @@
-// backend/controllers/postController.js
-
 const Post = require('../models/Post');
-const Tag = require('../models/Tag'); // If using a separate Tag model
+const Tag = require('../models/Tag');
 const User = require('../models/User');
-const { io } = require('../server'); // To emit events
+const { io } = require('../server');
+const mongoose = require('mongoose');
 
 // @desc    Get all posts by a specific user
 // @route   GET /api/posts/user
@@ -11,9 +10,34 @@ const { io } = require('../server'); // To emit events
 exports.getUserPosts = async (req, res) => {
   try {
     const userId = req.user._id;
-    const posts = await Post.find({ userId });
-    res.json(posts);
+    const posts = await Post.find({ userId })
+      .populate('userId', 'username profileImage')
+      .populate({
+        path: 'comments',
+        populate: {
+          path: 'replies',
+        },
+      })
+      .sort({ createdAt: -1 });
+
+    // Safely populate prompts
+    const populatedPosts = await Promise.all(posts.map(async (post) => {
+      if (post.prompt) {
+        try {
+          const populated = await post.populate('prompt');
+          return populated;
+        } catch (err) {
+          console.error(`Failed to populate prompt for post ${post._id}`);
+          post.prompt = null;
+          return post;
+        }
+      }
+      return post;
+    }));
+
+    res.json(populatedPosts);
   } catch (err) {
+    console.error('Error in getUserPosts:', err);
     res.status(500).json({ message: 'Failed to get user posts' });
   }
 };
@@ -35,16 +59,30 @@ exports.createPost = async (req, res, next) => {
       title,
       content,
       postType,
-      prompt,
+      prompt: prompt || null,
     });
 
     const savedPost = await newPost.save();
 
-    const io = req.app.get('io');
-    io.emit('newPost', savedPost);
+    // Populate the saved post before emitting
+    const populatedPost = await savedPost
+      .populate('userId', 'username profileImage');
 
-    res.status(201).json(savedPost);
+    if (prompt) {
+      try {
+        await populatedPost.populate('prompt');
+      } catch (err) {
+        console.error(`Failed to populate prompt for new post ${savedPost._id}`);
+        populatedPost.prompt = null;
+      }
+    }
+
+    const io = req.app.get('io');
+    io.emit('newPost', populatedPost);
+
+    res.status(201).json(populatedPost);
   } catch (error) {
+    console.error('Error in createPost:', error);
     next(error);
   }
 };
@@ -54,9 +92,12 @@ exports.createPost = async (req, res, next) => {
 // @access  Public
 exports.getPosts = async (req, res, next) => {
   try {
+    if (!mongoose.connection.readyState) {
+      return res.status(500).json({ message: 'Database connection not ready' });
+    }
+
     const posts = await Post.find()
-      .populate('userId', 'username')
-      .populate('prompt')
+      .populate('userId', 'username profileImage')
       .populate({
         path: 'comments',
         populate: {
@@ -64,8 +105,25 @@ exports.getPosts = async (req, res, next) => {
         },
       })
       .sort({ createdAt: -1 });
-    res.json(posts);
+
+    // Safely populate prompts
+    const populatedPosts = await Promise.all(posts.map(async (post) => {
+      if (post.prompt) {
+        try {
+          const populated = await post.populate('prompt');
+          return populated;
+        } catch (err) {
+          console.error(`Failed to populate prompt for post ${post._id}`);
+          post.prompt = null;
+          return post;
+        }
+      }
+      return post;
+    }));
+
+    res.json(populatedPosts);
   } catch (error) {
+    console.error('Error in getPosts:', error);
     next(error);
   }
 };
@@ -75,20 +133,43 @@ exports.getPosts = async (req, res, next) => {
 // @access  Public
 exports.getPostById = async (req, res, next) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid post ID format' });
+    }
+
     const post = await Post.findById(req.params.id)
-      .populate('userId', 'username')
-      .populate('prompt')
+      .populate('userId', 'username profileImage')
       .populate({
         path: 'comments',
-        populate: {
-        path: 'replies',
-        },
+        populate: [{
+          path: 'userId',
+          select: 'username profileImage'
+        }, {
+          path: 'replies',
+          populate: {
+            path: 'userId',
+            select: 'username profileImage'
+          }
+        }]
       });
+
     if (!post) {
       return res.status(404).json({ message: 'Post not found' });
     }
+
+    // Safely populate prompt if it exists
+    if (post.prompt) {
+      try {
+        await post.populate('prompt');
+      } catch (err) {
+        console.error(`Failed to populate prompt for post ${post._id}`);
+        post.prompt = null;
+      }
+    }
+
     res.json(post);
   } catch (error) {
+    console.error('Error in getPostById:', error);
     next(error);
   }
 };
@@ -97,7 +178,7 @@ exports.getPostById = async (req, res, next) => {
 // @route   PUT /api/posts/:id
 // @access  Private
 exports.updatePost = async (req, res, next) => {
-  const { content, postType, prompt } = req.body;
+  const { title, content, postType, prompt } = req.body;
   try {
     let post = await Post.findById(req.params.id);
     if (!post) {
@@ -108,14 +189,35 @@ exports.updatePost = async (req, res, next) => {
       return res.status(401).json({ message: 'Not authorized to update this post' });
     }
 
+    post.title = title || post.title;
     post.content = content || post.content;
     post.postType = postType || post.postType;
     post.prompt = prompt || post.prompt;
 
     const updatedPost = await post.save();
 
-    res.json(updatedPost);
+    // Populate the updated post
+    const populatedPost = await updatedPost
+      .populate('userId', 'username profileImage')
+      .populate({
+        path: 'comments',
+        populate: {
+          path: 'replies',
+        },
+      });
+
+    if (populatedPost.prompt) {
+      try {
+        await populatedPost.populate('prompt');
+      } catch (err) {
+        console.error(`Failed to populate prompt for updated post ${post._id}`);
+        populatedPost.prompt = null;
+      }
+    }
+
+    res.json(populatedPost);
   } catch (error) {
+    console.error('Error in updatePost:', error);
     next(error);
   }
 };
@@ -130,19 +232,18 @@ exports.deletePost = async (req, res, next) => {
       return res.status(404).json({ message: 'Post not found' });
     }
 
-    // Check if the user is the author
     if (post.userId.toString() !== req.user._id.toString()) {
       return res.status(401).json({ message: 'Not authorized to delete this post' });
     }
 
-    await post.deleteOne(); // Use deleteOne instead of remove
+    await post.deleteOne();
 
-    // Emit a socket event to notify other users about the post deletion
     const io = req.app.get('io');
     io.emit('postDeleted', { postId: req.params.id });
 
     res.json({ message: 'Post successfully deleted', postId: req.params.id });
   } catch (error) {
+    console.error('Error in deletePost:', error);
     next(error);
   }
 };
@@ -158,17 +259,22 @@ exports.likePost = async (req, res, next) => {
       return res.status(404).json({ message: 'Post not found' });
     }
 
-    // Check if the user has already liked the post
     if (post.likes.includes(req.user._id)) {
       return res.status(400).json({ message: 'You have already liked this post' });
     }
 
-    // Add the user's ID to the likes array
     post.likes.push(req.user._id);
     await post.save();
 
-    res.json({ message: 'Post liked', likes: post.likes.length });
+    const populatedPost = await post.populate('likes', 'username profileImage');
+    
+    res.json({
+      message: 'Post liked',
+      likes: populatedPost.likes.length,
+      likeDetails: populatedPost.likes
+    });
   } catch (error) {
+    console.error('Error in likePost:', error);
     next(error);
   }
 };
@@ -184,17 +290,22 @@ exports.unlikePost = async (req, res, next) => {
       return res.status(404).json({ message: 'Post not found' });
     }
 
-    // Check if the user has not liked the post yet
     if (!post.likes.includes(req.user._id)) {
       return res.status(400).json({ message: 'You have not liked this post yet' });
     }
 
-    // Remove the user's ID from the likes array
     post.likes = post.likes.filter(userId => userId.toString() !== req.user._id.toString());
     await post.save();
 
-    res.json({ message: 'Post unliked', likes: post.likes.length });
+    const populatedPost = await post.populate('likes', 'username profileImage');
+
+    res.json({
+      message: 'Post unliked',
+      likes: populatedPost.likes.length,
+      likeDetails: populatedPost.likes
+    });
   } catch (error) {
+    console.error('Error in unlikePost:', error);
     next(error);
   }
 };

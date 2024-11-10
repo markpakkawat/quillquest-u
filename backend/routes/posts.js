@@ -45,9 +45,13 @@ router.put('/:id', protect, updatePost);
 router.delete('/:id', protect, deletePost);
 
 // @route   PUT /api/posts/:id/like
+// @desc    Like a post
+// @access  Private
 router.put('/:id/like', protect, likePost);
 
 // @route   PUT /api/posts/:id/unlike
+// @desc    Unlike a post
+// @access  Private
 router.put('/:id/unlike', protect, unlikePost);
 
 module.exports = router;
