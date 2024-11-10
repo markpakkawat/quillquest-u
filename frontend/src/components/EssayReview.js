@@ -111,9 +111,9 @@ export const EssayReview = () => {
           <div className="flex items-center space-x-4">
             <button 
               onClick={() => navigate('/essaybuilder')} 
-              className="text-gray-600 hover:text-purple-600 transition-colors hover:bg-purple-300"
+              className="text-gray-600 hover:text-purple-600 transition-colors"
             >
-              <HomeIcon className="text-white h-6 w-6" />
+              <HomeIcon className="h-6 w-6" />
             </button>
             <h1 className="text-2xl font-semibold">{essayInfo?.title}</h1>
           </div>
@@ -131,7 +131,7 @@ export const EssayReview = () => {
 
       {/* Error Message */}
       {postingError && (
-        <div className="mt-8 bg-red-50 border-l-4 border-red-400 p-4 fixed top-20 right-4 max-w-md">
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 fixed top-20 right-4 max-w-md">
           <div className="flex items-start">
             <div className="flex-shrink-0">
               <XIcon className="h-5 w-5 text-red-400" />
@@ -141,9 +141,9 @@ export const EssayReview = () => {
             </div>
             <button 
               onClick={() => setPostingError(null)}
-              className="mt-0 mx-5 w-auto bg-purple-500"
+              className="ml-auto pl-3"
             >
-              <XIcon className="h-5 w-5 text-white-400 hover:text-red-500" />
+              <XIcon className="h-5 w-5 text-red-400 hover:text-red-500" />
             </button>
           </div>
         </div>

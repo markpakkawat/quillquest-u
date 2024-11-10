@@ -107,7 +107,7 @@ const UserStatistics = ({ statistics, postsCount, avgWordCount, loading }) => {
   }
 
   return (
-    <div className="mt-5 space-y-8">
+    <div className="space-y-8">
       {/* Basic Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <StatCard
