@@ -1,5 +1,16 @@
 import { ChatGroq } from "@langchain/groq";
 
+// Rate limiting configuration
+const RATE_LIMIT = {
+  maxRequests: 5,
+  windowMs: 10000,
+  requests: [],
+  retryDelay: 1000
+};
+
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+const getRetryDelay = (attempt) => Math.min(RATE_LIMIT.retryDelay * Math.pow(2, attempt), 32000);
+
 const ERROR_CATEGORIES = {
   spelling: [
     'typing_errors',

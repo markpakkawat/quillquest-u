@@ -15,6 +15,8 @@ import CompletionButton from '../components/CompletionButton';
 import EssayPreviewModal from '../components/EssayPreviewModal';
 import SectionPreview from '../components/SectionPreview';
 import { CompletionRequirementsModal } from '../components/CompletionRequirementsModal';
+import { saveErrorStats, saveCompletenessStats } from '../utils/errorTracking';
+import { analyzeWritingStyle } from '../utils/writing/writingAnalysis';
 
 
 
@@ -57,7 +59,6 @@ const getCategoryDisplayName = (category) => {
   };
   return displayNames[category] || category;
 };
-
 
 // SidebarItem component with connecting vertical lines
 const SidebarItem = ({ 
@@ -227,15 +228,61 @@ export default function EssayBlock() {
   const [isRevision] = useState(false);
   const [hasExistingBodyParagraphs, setHasExistingBodyParagraphs] = useState(false);
   const [existingBodyParagraphs, setExistingBodyParagraphs] = useState([]);
+  // Add to your state declarations at the top
+  const [startTime, setStartTime] = useState(null);
 
-  useEffect(() => {
-    if (allSections) {
-      const bodyParagraphs = allSections.filter(s => 
-        s.title.toLowerCase().includes('body paragraph')
-      );
-      setExistingBodyParagraphs(bodyParagraphs);
+  // Add this function to save writing analysis
+  const saveWritingAnalysis = async (content) => {
+    try {
+      const analysis = await analyzeWritingStyle(content);
+      if (analysis) {
+        localStorage.setItem(`writingStyle_${sectionId}`, JSON.stringify(analysis));
+      }
+    } catch (error) {
+      console.error('Error saving writing analysis:', error);
     }
-  }, [allSections]);
+  };
+
+  // In EssayBlock.js
+  useEffect(() => {
+    // When the section is first loaded
+    if (sectionId) {
+      // Set start time if not exists
+      if (!localStorage.getItem(`startTime_${sectionId}`)) {
+        const now = new Date().toISOString();
+        localStorage.setItem(`startTime_${sectionId}`, now);
+        setStartTime(now);
+      }
+      
+      // Update end time every second
+      const interval = setInterval(() => {
+        localStorage.setItem(`endTime_${sectionId}`, new Date().toISOString());
+      }, 1000);
+
+      // Update end time before unmounting
+      return () => {
+        clearInterval(interval);
+        localStorage.setItem(`endTime_${sectionId}`, new Date().toISOString());
+      };
+    }
+  }, [sectionId]);
+
+
+
+  // Add cleanup in your main useEffect
+  useEffect(() => {
+    const cleanup = () => {
+      if (startTime) {
+        localStorage.setItem(`endTime_${sectionId}`, new Date().toISOString());
+      }
+    };
+
+    window.addEventListener('beforeunload', cleanup);
+    return () => {
+      cleanup();
+      window.removeEventListener('beforeunload', cleanup);
+    };
+  }, [sectionId, startTime]);
   
 
   // Remove the duplicate useEffect and keep this single one
@@ -288,10 +335,23 @@ export default function EssayBlock() {
     return () => clearInterval(autoSaveTimer);
   }, [essayContent, sectionId]);
 
-  // In EssayBlock.js, modify handleContentChange
   const handleContentChange = (e) => {
     const newContent = e.target.value;
     setEssayContent(newContent);
+    
+    // When setting start time:
+    localStorage.setItem(`startTime_${sectionId}`, new Date().toISOString());
+    console.log('Set start time:', {
+      sectionId,
+      time: localStorage.getItem(`startTime_${sectionId}`)
+    });
+
+    // When setting end time:
+    localStorage.setItem(`endTime_${sectionId}`, new Date().toISOString());
+    console.log('Set end time:', {
+      sectionId,
+      time: localStorage.getItem(`endTime_${sectionId}`)
+    });
     
     // Save content
     localStorage.setItem(`essayContent_${sectionId}`, newContent);
@@ -306,6 +366,17 @@ export default function EssayBlock() {
       }
       return s;
     });
+
+    const saveWritingAnalysis = async (content, sectionId) => {
+      try {
+        const analysis = await analyzeWritingStyle(content);
+        if (analysis) {
+          localStorage.setItem(`writingStyle_${sectionId}`, JSON.stringify(analysis));
+        }
+      } catch (error) {
+        console.error('Error saving writing analysis:', error);
+      }
+    };
     
     // Save updated sections
     localStorage.setItem('essaySections', JSON.stringify(updatedSections));
@@ -313,6 +384,14 @@ export default function EssayBlock() {
     // Update state if location state exists
     if (location.state) {
       location.state.allSections = updatedSections;
+    }
+  
+    // Reset error states when content changes
+    if (hasChecked) {
+      setErrors({});
+      setHighlightedContent('');
+      setShowErrors(false);
+      setHasChecked(false);
     }
   };
 
@@ -376,11 +455,23 @@ export default function EssayBlock() {
       return s;
     });
   
-    // Remove the content and requirements from localStorage
+    // Clean up all stored data for the deleted section
     localStorage.removeItem(`essayContent_${paragraphId}`);
     localStorage.removeItem(`sectionRequirements_${paragraphId}`);
+    localStorage.removeItem(`startTime_${paragraphId}`);
+    localStorage.removeItem(`endTime_${paragraphId}`);
   
-    // If the deleted section was the current section, navigate to another section
+    // Clean up error stats
+    const errorStats = JSON.parse(localStorage.getItem('errorStats') || '[]');
+    const updatedErrorStats = errorStats.filter(stat => stat.sectionId !== paragraphId);
+    localStorage.setItem('errorStats', JSON.stringify(updatedErrorStats));
+  
+    // Clean up completeness stats
+    const completenessStats = JSON.parse(localStorage.getItem('completenessStats') || '[]');
+    const updatedCompletenessStats = completenessStats.filter(stat => stat.sectionId !== paragraphId);
+    localStorage.setItem('completenessStats', JSON.stringify(updatedCompletenessStats));
+  
+    // Rest of your navigation logic
     if (paragraphId === sectionId) {
       const currentIndex = allSections.findIndex(s => s.id === sectionId);
       const nextSection = finalSections[Math.min(currentIndex, finalSections.length - 1)];
@@ -393,7 +484,6 @@ export default function EssayBlock() {
         }
       });
     } else {
-      // Just update the state
       if (location.state) {
         location.state.allSections = finalSections;
       }
@@ -405,7 +495,7 @@ export default function EssayBlock() {
         }
       });
     }
-  };  
+  };
 
   const createHighlightedText = (text, errorList) => {
     if (!text || !errorList) return '';
@@ -544,34 +634,44 @@ export default function EssayBlock() {
 
   const toggleAssistant = () => setIsAssistantOpen(!isAssistantOpen);
 
+  // In EssayBlock.js, update handleCheck:
   const handleCheck = async () => {
     if (!essayContent.trim()) {
       alert('Please write something before checking for errors.');
       return;
     }
-  
+
     setIsChecking(true);
     try {
+      // Get errors from the checker
       const categorizedErrors = await checkEssayErrors(essayContent);
+      console.log('Errors from checker:', categorizedErrors);
+      
+      // Save error statistics locally first
+      await saveErrorStats(sectionId, categorizedErrors, section?.title);
+      
+      // Save writing analysis
+      saveWritingAnalysis(essayContent).catch(error => {
+        console.error('Failed to save writing analysis:', error);
+      });
+      
+      // Update UI with errors
       setErrors(categorizedErrors);
-      setHighlightedContent(createHighlightedText(essayContent, categorizedErrors));
-      setShowErrors(true);
-      setHasChecked(true);
-  
-      const firstCategoryWithErrors = ERROR_CATEGORIES.find(
-        category => categorizedErrors[category]?.length > 0
-      );
-      if (firstCategoryWithErrors) {
-        setActiveErrorCategory(firstCategoryWithErrors);
-      }
-  
-      const totalErrors = Object.values(categorizedErrors).flat().length;
-      const newScore = Math.max(0, score + (10 - totalErrors));
-      setScore(newScore);
-  
-      if (totalErrors === 0) {
+      if (Object.values(categorizedErrors).some(arr => arr.length > 0)) {
+        setHighlightedContent(createHighlightedText(essayContent, categorizedErrors));
+        setShowErrors(true);
+        setHasChecked(true);
+
+        const firstCategory = Object.keys(categorizedErrors)
+          .find(category => categorizedErrors[category]?.length > 0);
+          
+        if (firstCategory) {
+          setActiveErrorCategory(firstCategory);
+        }
+      } else {
         alert('Great job! No errors found in this section. 🎉');
       }
+      
     } catch (error) {
       console.error('Error checking essay:', error);
       alert('Sorry, there was a problem checking your essay. Please try again.');

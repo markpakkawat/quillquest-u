@@ -4,12 +4,14 @@ import Navbar from '../components/Navbar';
 import api from '../services/api';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { Link } from 'react-router-dom';
+import UserStatistics from '../components/UserStatistics';
+import { analyzeWritingStyle } from '../utils/writing/writingAnalysis';
 
-// const Notification = ({ message, type, onClose }) => {
-//   if (!message) return null;
+const Notification = ({ message, type, onClose }) => {
+  if (!message) return null;
 
-//   const notificationClass =
-//     type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700';
+  const notificationClass =
+    type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700';
 
   return (
     <div className={`space-x-2 border p-1 w-auto rounded-xl ${notificationClass}`} role="alert">
@@ -93,20 +95,19 @@ const Profile = () => {
       const token = localStorage.getItem('token');
       const response = await api.get('/users/profile', {
         headers: {
-          Authorization: `Bearer ${token}`, // Pass token in Authorization header
+          Authorization: `Bearer ${token}`,
         },
       });
-      setProfileData(response.data); // Set the profile data in state
+      setProfileData(response.data);
       setUsername(response.data.username);
       setEmail(response.data.email);
-      setAvatarColor(response.data.avatarColor || 'bg-purple-600'); // Set the avatar color from the response or default
+      setAvatarColor(response.data.avatarColor || 'bg-purple-600');
     } catch (err) {
       console.error('Error fetching profile:', err);
-      setError('Failed to load profile');
+      throw err;
     }
   };
 
-  // Fetch user's posts count, total likes, and average word count
   const fetchPostsData = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -139,7 +140,11 @@ const Profile = () => {
       return sortedPosts;
     } catch (err) {
       console.error('Error fetching posts data:', err);
-      setError('Failed to load posts data');
+      setUserPosts([]);
+      setPostsCount(0);
+      setTotalLikes(0);
+      setAvgWordCount(0);
+      return [];
     }
   };
 
@@ -162,7 +167,6 @@ const Profile = () => {
     fetchAllData();
   }, []);
 
-  // Track changes to username, email, or avatarColor
   useEffect(() => {
     if (
       profileData &&
@@ -176,13 +180,56 @@ const Profile = () => {
     }
   }, [username, email, avatarColor, profileData]);
 
-  // Display loading or error messages
-  if (!profileData && !error) {
-    return <p>Loading profile...</p>;
+  const handleSave = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await api.put(
+        '/users/profile',
+        {
+          username: username || profileData.username,
+          email: email || profileData.email,
+          avatarColor,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      setProfileData(response.data);
+      setIsEditing(false);
+      setNotification({ message: 'Profile updated successfully', type: 'success' });
+    } catch (err) {
+      console.error('Error saving profile:', err);
+      setError('Failed to save profile');
+      setNotification({ message: 'Failed to update profile', type: 'error' });
+    }
+  };
+
+  const handleCancel = () => {
+    setUsername(profileData.username);
+    setEmail(profileData.email);
+    setAvatarColor(profileData.avatarColor || 'bg-purple-600');
+    setIsEditing(false);
+  };
+
+  const handleCustomize = () => {
+    const colors = ['bg-purple-600', 'bg-blue-600', 'bg-green-600', 'bg-red-600', 'bg-yellow-600'];
+    const currentIndex = colors.indexOf(avatarColor);
+    const nextIndex = (currentIndex + 1) % colors.length;
+    setAvatarColor(colors[nextIndex]);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
+      </div>
+    );
   }
 
   if (error) {
-    return <p>{error}</p>;
+    return <p className="text-center text-red-500 mt-8">{error}</p>;
   }
 
 // In the return statement of Profile component, wrap the adjacent elements properly:
