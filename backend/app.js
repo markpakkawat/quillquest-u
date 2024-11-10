@@ -64,7 +64,6 @@ const statisticsRoutes = require('./routes/statistics');
 // 6. Apply Routes
 // In app.js, modify the route mounting section to properly nest statistics routes
 
-const express = require('express');
 // ... other imports remain the same ...
 
 // Update route mounting section
