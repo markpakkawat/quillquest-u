@@ -206,5 +206,9 @@ api.isRetryable = (error) => {
   if (!error.response) return true;
   return error.response.status >= 500 || error.response.status === 429;
 };
+let logoutHandler;
 
+export const setLogoutHandler = (params) => {
+  logoutHandler = logout;
+};
 export default api;
