@@ -52,68 +52,73 @@ const ERROR_CATEGORIES = {
 };
 
 const cleanAndParseJSON = (jsonString) => {
-  console.log('Original response:', jsonString);
-  let cleaned = '';
+  if (!jsonString) return [];
   
+  // If it's already an object, return it
+  if (typeof jsonString === 'object') return jsonString;
+
   try {
     // First try direct parsing
-    return JSON.parse(jsonString);
+    const parsed = JSON.parse(jsonString);
+    return parsed;
   } catch (e) {
     try {
-      // Try to find JSON array in the response
-      const match = jsonString.match(/\[\s*{[\s\S]*}\s*\]/);
-      if (!match) {
-        console.error('No JSON array pattern found in response');
-        return [];
+      // Extract JSON array pattern
+      let cleaned = jsonString;
+      
+      // If the response contains markdown code blocks, extract the JSON
+      const codeBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (codeBlockMatch) {
+        cleaned = codeBlockMatch[1];
       }
 
-      cleaned = match[0];
-      console.log('Matched JSON:', cleaned);
-
-      // Step by step cleaning
-      const cleaningSteps = [
-        // Remove newlines and extra spaces
-        [/\s+/g, ' '],
-        // Ensure property names are properly quoted
-        [/(\{|\,)\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":'],
-        // Fix single quotes to double quotes
-        [/:\s*'([^']*)'/g, ':"$1"'],
-        // Remove trailing commas
-        [/,(\s*[}\]])/g, '$1'],
-        // Ensure string values are properly quoted
-        [/:\s*([^"][^,}\]]*)/g, ':"$1"'],
-        // Fix escaped quotes
-        [/\\"/g, '"'],
-        [/""/g, '"'],
-        // Remove any remaining illegal characters
-        [/[\x00-\x1F\x7F-\x9F]/g, '']
-      ];
-
-      // Apply each cleaning step and log the result
-      cleaningSteps.forEach(([regex, replacement], index) => {
-        const before = cleaned;
-        cleaned = cleaned.replace(regex, replacement);
-        if (before !== cleaned) {
-          console.log(`Cleaning step ${index + 1}:`, cleaned);
+      // Find JSON array pattern if not in code block
+      if (!cleaned.trim().startsWith('[')) {
+        const arrayMatch = cleaned.match(/\[\s*{[\s\S]*}\s*\]/);
+        if (arrayMatch) {
+          cleaned = arrayMatch[0];
         }
-      });
-
-      try {
-        return JSON.parse(cleaned);
-      } catch (parseError) {
-        // If still fails, try one more aggressive cleaning
-        cleaned = cleaned
-          .replace(/[^\[\]{}:,"\w\s.-]/g, '') // Remove any non-JSON characters
-          .replace(/"\s+"/g, '" "')          // Fix spaces between strings
-          .replace(/\s+/g, ' ')              // Normalize whitespace
-          .trim();
-
-        console.log('Final cleaning attempt:', cleaned);
-        return JSON.parse(cleaned);
       }
+
+      // Progressive cleaning steps
+      cleaned = cleaned
+        // Remove line breaks and extra spaces
+        .replace(/\s+/g, ' ')
+        // Remove any non-printable characters
+        .replace(/[\x00-\x1F\x7F-\x9F]/g, '')
+        // Ensure property names are properly quoted
+        .replace(/(\{|\,)\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":')
+        // Standardize quotes
+        .replace(/'/g, '"')
+        // Fix double quotes around property values
+        .replace(/:\s*"([^"]*)"/g, ':"$1"')
+        // Fix unquoted values
+        .replace(/:\s*([^,}\]]*)/g, (match, value) => {
+          // Don't quote numbers or booleans
+          if (/^(\-?\d+\.?\d*|true|false|null)$/.test(value.trim())) {
+            return `:${value.trim()}`;
+          }
+          return `:"${value.trim()}"`;
+        })
+        // Remove trailing commas
+        .replace(/,(\s*[}\]])/g, '$1')
+        // Fix escaped quotes
+        .replace(/\\"/g, '"')
+        .replace(/""/g, '"')
+        // Ensure array elements are properly separated
+        .replace(/}(\s*){/g, '},{')
+        .trim();
+
+      // Final validation and parsing
+      if (!cleaned.startsWith('[')) cleaned = `[${cleaned}]`;
+      if (!cleaned.endsWith(']')) cleaned = `${cleaned}]`;
+
+      const parsed = JSON.parse(cleaned);
+      
+      // Validate structure
+      return Array.isArray(parsed) ? parsed : [parsed];
     } catch (innerError) {
-      console.error('JSON Cleaning Steps Failed:', innerError);
-      console.error('Final attempted JSON:', cleaned);
+      console.error('JSON parsing failed:', innerError);
       return [];
     }
   }
@@ -129,79 +134,49 @@ export const checkEssayErrors = async (content, attempt = 0) => {
 
     if (RATE_LIMIT.requests.length >= RATE_LIMIT.maxRequests) {
       const waitTime = getRetryDelay(attempt);
-      console.log(`Rate limit reached, waiting ${waitTime}ms before retry`);
       await delay(waitTime);
       return checkEssayErrors(content, attempt + 1);
     }
 
-    // Track this request
     RATE_LIMIT.requests.push(now);
 
     const llm = new ChatGroq({
       apiKey: process.env.REACT_APP_GROQ_API_KEY,
       model: "llama3-70b-8192",
       temperature: 0,
-      maxTokens: 2048,
-      configuration: {
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
-        }
-      }
+      maxTokens: 2048
     });
 
     const systemMessage = {
       role: 'system',
-      content: `You are an essay error detection system. Return ONLY a JSON array of objects with this EXACT structure, nothing else:
-[
-  {
-    "category": "spelling",
-    "type": "typing_errors",
-    "message": "Error explanation",
-    "suggestions": ["suggestion1"],
-    "text": "problematic text"
-  }
-]
+      content: `You are an essay error detection system. Analyze the text and return ONLY a JSON array containing found errors in this exact format:
+[{
+  "category": "one of: spelling|punctuation|lexicoSemantic|stylistic|typographical",
+  "type": "specific_error_type",
+  "message": "Clear explanation of the error",
+  "suggestions": ["improvement1", "improvement2"],
+  "text": "the problematic text"
+}]
 
-Categories must be one of: spelling, punctuation, lexicoSemantic, stylistic, typographical.
-Do not include any explanations or text outside the JSON array.
-Ensure all property names and string values are in double quotes.
-Do not use single quotes.
-Do not add trailing commas.
-
-Check for:
-1. Spelling: typing mistakes, noun endings, agreement errors, capitalization, compounds
-2. Punctuation: commas, colons, semicolons, periods, clause separation
-3. Lexico-Semantic: unclear meanings, missing words, possessives, word choice
-4. Stylistic: informal language, repetition, passive voice, word order, complexity
-5. Typographical: spacing, layout, formatting`
+Return only the JSON array, no other text or explanation. Ensure all strings use double quotes, not single quotes.`
     };
 
-    const userMessage = {
-      role: 'user',
-      content: `Return ONLY a proper JSON array of errors found in this text: "${content}"`
-    };
+    const response = await llm.invoke([
+      systemMessage,
+      { role: 'user', content: `Find errors in this text: "${content}"` }
+    ]);
 
-    const response = await llm.invoke([systemMessage, userMessage]);
+    const errors = cleanAndParseJSON(response.content);
     
-    // Parse and validate response
-    let errors = cleanAndParseJSON(response.content);
-    
-    if (!Array.isArray(errors)) {
-      console.error('AI response is not an array:', errors);
-      errors = [];
-    }
-
-    // Categorize errors
+    // Validate and categorize errors
     const categorizedErrors = Object.keys(ERROR_CATEGORIES).reduce((acc, category) => {
       acc[category] = errors
-        .filter(error => error.category === category)
+        .filter(error => error?.category?.toLowerCase() === category.toLowerCase())
         .map(error => ({
-          text: error.text || '',
-          message: error.message || '',
-          type: error.type || '',
-          suggestions: Array.isArray(error.suggestions) ? error.suggestions : []
+          text: String(error.text || ''),
+          message: String(error.message || ''),
+          type: String(error.type || ''),
+          suggestions: Array.isArray(error.suggestions) ? error.suggestions.map(String) : []
         }));
       return acc;
     }, {});
@@ -218,7 +193,6 @@ Check for:
   } catch (error) {
     if (error.response?.status === 429) {
       const waitTime = getRetryDelay(attempt);
-      console.warn(`Rate limit reached. Retrying in ${waitTime}ms...`);
       await delay(waitTime);
       return checkEssayErrors(content, attempt + 1);
     }

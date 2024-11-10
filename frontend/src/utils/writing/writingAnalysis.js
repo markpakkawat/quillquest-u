@@ -2,19 +2,14 @@ import { ChatGroq } from "@langchain/groq";
 
 // Rate limiting configuration
 const RATE_LIMIT = {
-  maxRequests: 5, // Maximum requests per window
-  windowMs: 10000, // Time window in milliseconds (10 seconds)
-  requests: [],    // Track request timestamps
-  retryDelay: 1000 // Base delay for retries (1 second)
+  maxRequests: 5,
+  windowMs: 10000,
+  requests: [],
+  retryDelay: 1000
 };
 
-// Delay helper
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-
-// Add exponential backoff for retries
-const getRetryDelay = (attempt) => {
-  return Math.min(RATE_LIMIT.retryDelay * Math.pow(2, attempt), 32000); // Max 32 seconds
-};
+const getRetryDelay = (attempt) => Math.min(RATE_LIMIT.retryDelay * Math.pow(2, attempt), 32000);
 
 export const analyzeWritingStyle = async (text, attempt = 0) => {
   try {
@@ -91,7 +86,49 @@ export const analyzeWritingStyle = async (text, attempt = 0) => {
       jsonStr = jsonStr.substring(jsonStr.indexOf('{'), jsonStr.lastIndexOf('}') + 1);
     }
 
-    return JSON.parse(jsonStr);
+    const analysis = JSON.parse(jsonStr);
+    
+    // Validate and ensure all expected properties exist
+    return {
+      tone: {
+        type: analysis.tone?.type || "Neutral",
+        confidence: analysis.tone?.confidence || 0,
+        characteristics: Array.isArray(analysis.tone?.characteristics) 
+          ? analysis.tone.characteristics 
+          : []
+      },
+      voice: {
+        type: analysis.voice?.type || "Mixed",
+        activeVoicePercentage: analysis.voice?.activeVoicePercentage || 0,
+        passiveVoiceInstances: analysis.voice?.passiveVoiceInstances || 0
+      },
+      clarity: {
+        score: analysis.clarity?.score || 0,
+        level: analysis.clarity?.level || "Moderate",
+        strengths: Array.isArray(analysis.clarity?.strengths) 
+          ? analysis.clarity.strengths 
+          : [],
+        improvements: Array.isArray(analysis.clarity?.improvements) 
+          ? analysis.clarity.improvements 
+          : []
+      },
+      complexity: {
+        sentenceStructure: {
+          score: analysis.complexity?.sentenceStructure?.score || 0,
+          averageLength: analysis.complexity?.sentenceStructure?.averageLength || 0,
+          varietyScore: analysis.complexity?.sentenceStructure?.varietyScore || 0
+        },
+        wordChoice: {
+          complexWordsPercentage: analysis.complexity?.wordChoice?.complexWordsPercentage || 0,
+          academicVocabularyScore: analysis.complexity?.wordChoice?.academicVocabularyScore || 0
+        },
+        paragraphCohesion: {
+          score: analysis.complexity?.paragraphCohesion?.score || 0,
+          transitionStrength: analysis.complexity?.paragraphCohesion?.transitionStrength || "Moderate",
+          logicalFlowScore: analysis.complexity?.paragraphCohesion?.logicalFlowScore || 0
+        }
+      }
+    };
 
   } catch (error) {
     if (error.response?.status === 429) {
@@ -100,81 +137,87 @@ export const analyzeWritingStyle = async (text, attempt = 0) => {
       await delay(waitTime);
       return analyzeWritingStyle(text, attempt + 1);
     }
-    throw error;
+    console.error('Writing analysis error:', error);
+    return getDefaultAnalysis();
   }
 };
 
-
-// Helper functions for aggregating style analyses
 export const aggregateStyleAnalyses = (analyses) => {
-  if (!analyses.length) return null;
+  if (!Array.isArray(analyses) || analyses.length === 0) return getDefaultAnalysis();
 
-  const aggregated = analyses.reduce((acc, style) => {
+  const validAnalyses = analyses.filter(Boolean);
+  if (validAnalyses.length === 0) return getDefaultAnalysis();
+
+  const aggregated = validAnalyses.reduce((acc, style) => {
     if (!style) return acc;
 
     return {
       tone: {
-        formal: acc.tone.formal + (style.tone.type === 'Formal' ? 1 : 0),
-        informal: acc.tone.informal + (style.tone.type === 'Informal' ? 1 : 0),
-        neutral: acc.tone.neutral + (style.tone.type === 'Neutral' ? 1 : 0),
-        characteristics: [...acc.tone.characteristics, ...style.tone.characteristics]
+        formal: acc.tone.formal + (style.tone?.type === 'Formal' ? 1 : 0),
+        informal: acc.tone.informal + (style.tone?.type === 'Informal' ? 1 : 0),
+        neutral: acc.tone.neutral + (style.tone?.type === 'Neutral' ? 1 : 0),
+        characteristics: [...acc.tone.characteristics, ...(style.tone?.characteristics || [])]
       },
       voice: {
-        activePercentage: acc.voice.activePercentage + style.voice.activeVoicePercentage,
-        totalPassiveInstances: acc.voice.totalPassiveInstances + style.voice.passiveVoiceInstances,
-        suggestions: [...acc.voice.suggestions, ...style.voice.suggestions]
+        activePercentage: acc.voice.activePercentage + (style.voice?.activeVoicePercentage || 0),
+        totalPassiveInstances: acc.voice.totalPassiveInstances + (style.voice?.passiveVoiceInstances || 0)
       },
       clarity: {
-        averageScore: acc.clarity.averageScore + style.clarity.score,
-        strengths: [...acc.clarity.strengths, ...style.clarity.strengths],
-        improvements: [...acc.clarity.improvements, ...style.clarity.improvements]
+        averageScore: acc.clarity.averageScore + (style.clarity?.score || 0),
+        strengths: [...acc.clarity.strengths, ...(style.clarity?.strengths || [])],
+        improvements: [...acc.clarity.improvements, ...(style.clarity?.improvements || [])]
       },
       complexity: {
         sentenceStructure: {
-          averageScore: acc.complexity.sentenceStructure.averageScore + style.complexity.sentenceStructure.score,
-          averageLength: acc.complexity.sentenceStructure.averageLength + style.complexity.sentenceStructure.averageLength
+          averageScore: acc.complexity.sentenceStructure.averageScore + (style.complexity?.sentenceStructure?.score || 0),
+          averageLength: acc.complexity.sentenceStructure.averageLength + (style.complexity?.sentenceStructure?.averageLength || 0),
+          varietyScore: acc.complexity.sentenceStructure.varietyScore + (style.complexity?.sentenceStructure?.varietyScore || 0)
         },
         wordChoice: {
-          complexWords: acc.complexity.wordChoice.complexWords + style.complexity.wordChoice.complexWordsPercentage,
-          academicVocabulary: acc.complexity.wordChoice.academicVocabulary + style.complexity.wordChoice.academicVocabularyScore
+          complexWords: acc.complexity.wordChoice.complexWords + (style.complexity?.wordChoice?.complexWordsPercentage || 0),
+          academicVocabulary: acc.complexity.wordChoice.academicVocabulary + (style.complexity?.wordChoice?.academicVocabularyScore || 0)
         },
         paragraphCohesion: {
-          averageScore: acc.complexity.paragraphCohesion.averageScore + style.complexity.paragraphCohesion.score,
-          transitionStrengths: [...acc.complexity.paragraphCohesion.transitionStrengths, style.complexity.paragraphCohesion.transitionStrength]
+          averageScore: acc.complexity.paragraphCohesion.averageScore + (style.complexity?.paragraphCohesion?.score || 0),
+          transitionStrengths: [...acc.complexity.paragraphCohesion.transitionStrengths, style.complexity?.paragraphCohesion?.transitionStrength || 'Moderate']
         }
       }
     };
   }, {
     tone: { formal: 0, informal: 0, neutral: 0, characteristics: [] },
-    voice: { activePercentage: 0, totalPassiveInstances: 0, suggestions: [] },
+    voice: { activePercentage: 0, totalPassiveInstances: 0 },
     clarity: { averageScore: 0, strengths: [], improvements: [] },
     complexity: {
-      sentenceStructure: { averageScore: 0, averageLength: 0 },
+      sentenceStructure: { averageScore: 0, averageLength: 0, varietyScore: 0 },
       wordChoice: { complexWords: 0, academicVocabulary: 0 },
       paragraphCohesion: { averageScore: 0, transitionStrengths: [] }
     }
   });
 
-  const count = analyses.length;
+  const count = validAnalyses.length;
+
   return {
     tone: {
-      dominant: getDominantTone(aggregated.tone),
+      type: getDominantTone(aggregated.tone),
       characteristics: [...new Set(aggregated.tone.characteristics)].slice(0, 3)
     },
     voice: {
-      activePercentage: Math.round(aggregated.voice.activePercentage / count),
-      averagePassiveInstances: Math.round(aggregated.voice.totalPassiveInstances / count),
-      commonSuggestions: [...new Set(aggregated.voice.suggestions)].slice(0, 3)
+      type: aggregated.voice.activePercentage > 70 ? 'Active' : 
+            aggregated.voice.activePercentage < 30 ? 'Passive' : 'Mixed',
+      activeVoicePercentage: Math.round(aggregated.voice.activePercentage / count),
+      passiveVoiceInstances: Math.round(aggregated.voice.totalPassiveInstances / count)
     },
     clarity: {
       score: Math.round(aggregated.clarity.averageScore / count),
-      commonStrengths: [...new Set(aggregated.clarity.strengths)].slice(0, 3),
-      commonImprovements: [...new Set(aggregated.clarity.improvements)].slice(0, 3)
+      level: getClarityLevel(Math.round(aggregated.clarity.averageScore / count)),
+      strengths: [...new Set(aggregated.clarity.strengths)].slice(0, 3),
+      improvements: [...new Set(aggregated.clarity.improvements)].slice(0, 3)
     },
     complexity: {
       sentenceStructure: {
         score: Math.round(aggregated.complexity.sentenceStructure.averageScore / count),
-        averageLength: Math.round(aggregated.complexity.sentenceStructure.averageLength / count)
+        averageLength: Math.round(aggregated.complexity.sentenceStructure.averageLength / count),
+        varietyScore: Math.round(aggregated.complexity.sentenceStructure.varietyScore / count)
       },
       wordChoice: {
         complexWordsPercentage: Math.round(aggregated.complexity.wordChoice.complexWords / count),
@@ -182,13 +225,13 @@ export const aggregateStyleAnalyses = (analyses) => {
       },
       paragraphCohesion: {
         score: Math.round(aggregated.complexity.paragraphCohesion.averageScore / count),
-        dominantTransitionStrength: getMostCommonValue(aggregated.complexity.paragraphCohesion.transitionStrengths)
+        transitionStrength: getMostCommonValue(aggregated.complexity.paragraphCohesion.transitionStrengths),
+        logicalFlowScore: Math.round(aggregated.complexity.paragraphCohesion.averageScore / count)
       }
     }
   };
 };
 
-// Helper functions for tone analysis
 const getDominantTone = (toneStats) => {
   const { formal, informal, neutral } = toneStats;
   if (formal > informal && formal > neutral) return 'Formal';
@@ -196,8 +239,50 @@ const getDominantTone = (toneStats) => {
   return 'Neutral';
 };
 
+const getClarityLevel = (score) => {
+  if (score >= 80) return 'High';
+  if (score >= 60) return 'Moderate';
+  return 'Low';
+};
+
 const getMostCommonValue = (array) => {
+  if (!array.length) return 'Moderate';
   return array.sort((a, b) =>
     array.filter(v => v === a).length - array.filter(v => v === b).length
   ).pop();
 };
+
+export const getDefaultAnalysis = () => ({
+  tone: {
+    type: "Neutral",
+    confidence: 0,
+    characteristics: []
+  },
+  voice: {
+    type: "Mixed",
+    activeVoicePercentage: 0,
+    passiveVoiceInstances: 0
+  },
+  clarity: {
+    score: 0,
+    level: "Analyzing...",
+    strengths: [],
+    improvements: []
+  },
+  complexity: {
+    sentenceStructure: {
+      score: 0,
+      averageLength: 0,
+      varietyScore: 0
+    },
+    wordChoice: {
+      complexWordsPercentage: 0,
+      academicVocabularyScore: 0
+    },
+    paragraphCohesion: {
+      score: 0,
+      transitionStrength: "Moderate",
+      logicalFlowScore: 0
+    }
+  }
+});
