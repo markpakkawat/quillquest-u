@@ -49,12 +49,6 @@ const resetPasswordRoute = require('./routes/resetPassword');
 
 const statisticsRoutes = require('./routes/statistics');
 
-// 6. Apply Routes
-// In app.js, modify the route mounting section to properly nest statistics routes
-
-// ... other imports remain the same ...
-
-
 // Routes
 app.use('/api/auth', authRoutes, resetPasswordRoute);
 app.use('/api/users', userRoutes);
