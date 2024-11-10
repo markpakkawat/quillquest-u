@@ -63,7 +63,6 @@ const calculateErrorRate = (posts) => {
     sum + (post.statistics?.overall?.totalErrors || 0), 0
   );
   const totalWords = calculateTotalWords(posts);
-  // Remove the ternary and use a regular if statement
   if (totalWords) {
     return Math.round((totalErrors / totalWords) * 1000) / 10;
   }
@@ -353,10 +352,24 @@ const getWritingStats = async (req, res, next) => {
   }
 };
 
+const checkEmailAvailability = async (req, res, next) => {
+  try {
+    const email = req.query.email;
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.json({ available: false });
+    }
+    res.json({ available: true });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getProfile,
   updateProfile,
   getUserProfileById,
   getMonthlyStats,
-  getWritingStats
+  getWritingStats,
+  checkEmailAvailability
 };

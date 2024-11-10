@@ -7,6 +7,19 @@ import { Link } from 'react-router-dom';
 import UserStatistics from '../components/UserStatistics';
 import { analyzeWritingStyle } from '../utils/writing/writingAnalysis';
 
+const Notification = ({ message, type, onClose }) => {
+  if (!message) return null;
+
+  const notificationClass =
+    type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700';
+
+  return (
+    <div className={`space-x-2 border p-1 w-auto rounded-xl ${notificationClass}`} role="alert">
+      <span>{message}</span>
+    </div>
+  );
+};
+
 const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [username, setUsername] = useState(null);
@@ -19,6 +32,8 @@ const Profile = () => {
   const [avgWordCount, setAvgWordCount] = useState(0);
   const [hasChanges, setHasChanges] = useState(false);
   const [userPosts, setUserPosts] = useState([]);
+  const [notification, setNotification] = useState({ message: '', type: '' });
+  const [isLoading, setIsLoading] = useState(true);
   const [statisticsData, setStatisticsData] = useState({
     currentSession: {
       essaySections: [],
@@ -27,118 +42,112 @@ const Profile = () => {
     },
     historical: null
   });
-  const [isLoading, setIsLoading] = useState(true);
 
-// In Profile.js, modify the fetchStatistics function to include writing analysis
+  const fetchStatistics = async () => {
+    try {
+      const essaySections = JSON.parse(localStorage.getItem('essaySections') || '[]');
+      const errorStats = JSON.parse(localStorage.getItem('errorStats') || '[]');
+      const completenessStats = JSON.parse(localStorage.getItem('completenessStats') || '[]');
 
-const fetchStatistics = async () => {
-  try {
-    const essaySections = JSON.parse(localStorage.getItem('essaySections') || '[]');
-    const errorStats = JSON.parse(localStorage.getItem('errorStats') || '[]');
-    const completenessStats = JSON.parse(localStorage.getItem('completenessStats') || '[]');
-
-    const token = localStorage.getItem('token');
-    const writingStatsResponse = await api.get('/users/writing-stats', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    // Get latest post content
-    const latestPost = userPosts[0];
-    let latestPostAnalysis = null;
-
-    if (latestPost?.content) {
-      try {
-        latestPostAnalysis = await analyzeWritingStyle(latestPost.content);
-      } catch (error) {
-        console.warn('Error analyzing latest post:', error);
-      }
-    }
-
-    const currentSessionStats = {
-      essaySections,
-      errorStats,
-      completenessStats,
-      currentErrors: {},
-      totalErrors: 0,
-      errorTrends: [],
-      sectionRates: {},
-      commonMissingRequirements: [],
-      completionStatus: {
-        totalSections: essaySections.length,
-        completedSections: completenessStats.filter(stat => stat.isComplete).length,
-        completionRate: essaySections.length > 0 
-          ? Math.round((completenessStats.filter(stat => stat.isComplete).length / essaySections.length) * 100)
-          : 0
-      }
-    };
-
-    // Calculate error stats
-    if (errorStats.length > 0) {
-      currentSessionStats.totalErrors = errorStats.reduce((sum, stat) => 
-        sum + (stat.totalErrors || 0), 0
-      );
-      
-      errorStats.forEach(stat => {
-        if (stat.errorsByCategory) {
-          Object.entries(stat.errorsByCategory).forEach(([category, count]) => {
-            currentSessionStats.currentErrors[category] = 
-              (currentSessionStats.currentErrors[category] || 0) + count;
-          });
-        }
+      const token = localStorage.getItem('token');
+      const writingStatsResponse = await api.get('/users/writing-stats', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
-    }
 
-    // Create the historical data with writing analysis
-    const historicalData = {
-      ...writingStatsResponse.data,
-      qualityMetrics: {
-        ...writingStatsResponse.data.qualityMetrics,
-        ...(latestPostAnalysis && {
-          clarity: latestPostAnalysis.clarity.score,
-          complexity: latestPostAnalysis.complexity.sentenceStructure.score,
-          activeVoice: latestPostAnalysis.voice.activeVoicePercentage,
-          errorRate: currentSessionStats.totalErrors / (essaySections.length || 1)
-        })
-      },
-      writingStyle: latestPostAnalysis
-    };
+      const latestPost = userPosts[0];
+      let latestPostAnalysis = null;
 
-    setStatisticsData({
-      currentSession: currentSessionStats,
-      historical: historicalData
-    });
+      if (latestPost?.content) {
+        try {
+          latestPostAnalysis = await analyzeWritingStyle(latestPost.content);
+        } catch (error) {
+          console.warn('Error analyzing latest post:', error);
+        }
+      }
 
-  } catch (error) {
-    console.error('Error fetching statistics:', error);
-    setStatisticsData({
-      currentSession: {
-        essaySections: [],
-        errorStats: [],
-        completenessStats: [],
+      const currentSessionStats = {
+        essaySections,
+        errorStats,
+        completenessStats,
         currentErrors: {},
         totalErrors: 0,
         errorTrends: [],
         sectionRates: {},
         commonMissingRequirements: [],
         completionStatus: {
-          totalSections: 0,
-          completedSections: 0,
-          completionRate: 0
+          totalSections: essaySections.length,
+          completedSections: completenessStats.filter(stat => stat.isComplete).length,
+          completionRate: essaySections.length > 0 
+            ? Math.round((completenessStats.filter(stat => stat.isComplete).length / essaySections.length) * 100)
+            : 0
         }
-      },
-      historical: {
-        qualityMetrics: {
-          clarity: 0,
-          complexity: 0,
-          activeVoice: 0,
-          errorRate: 0
-        }
+      };
+
+      if (errorStats.length > 0) {
+        currentSessionStats.totalErrors = errorStats.reduce((sum, stat) => 
+          sum + (stat.totalErrors || 0), 0
+        );
+        
+        errorStats.forEach(stat => {
+          if (stat.errorsByCategory) {
+            Object.entries(stat.errorsByCategory).forEach(([category, count]) => {
+              currentSessionStats.currentErrors[category] = 
+                (currentSessionStats.currentErrors[category] || 0) + count;
+            });
+          }
+        });
       }
-    });
-  }
-};
+
+      const historicalData = {
+        ...writingStatsResponse.data,
+        qualityMetrics: {
+          ...writingStatsResponse.data.qualityMetrics,
+          ...(latestPostAnalysis && {
+            clarity: latestPostAnalysis.clarity.score,
+            complexity: latestPostAnalysis.complexity.sentenceStructure.score,
+            activeVoice: latestPostAnalysis.voice.activeVoicePercentage,
+            errorRate: currentSessionStats.totalErrors / (essaySections.length || 1)
+          })
+        },
+        writingStyle: latestPostAnalysis
+      };
+
+      setStatisticsData({
+        currentSession: currentSessionStats,
+        historical: historicalData
+      });
+
+    } catch (error) {
+      console.error('Error fetching statistics:', error);
+      setStatisticsData({
+        currentSession: {
+          essaySections: [],
+          errorStats: [],
+          completenessStats: [],
+          currentErrors: {},
+          totalErrors: 0,
+          errorTrends: [],
+          sectionRates: {},
+          commonMissingRequirements: [],
+          completionStatus: {
+            totalSections: 0,
+            completedSections: 0,
+            completionRate: 0
+          }
+        },
+        historical: {
+          qualityMetrics: {
+            clarity: 0,
+            complexity: 0,
+            activeVoice: 0,
+            errorRate: 0
+          }
+        }
+      });
+    }
+  };
 
   const fetchProfile = async () => {
     try {
@@ -167,12 +176,10 @@ const fetchStatistics = async () => {
         },
       });
   
-      // Sort posts by date
       const sortedPosts = response.data.sort((a, b) => 
         new Date(b.createdAt) - new Date(a.createdAt)
       );
   
-      // Calculate metrics
       const likesCount = sortedPosts.reduce((acc, post) => 
         acc + (post.likes?.length || 0), 0
       );
@@ -184,13 +191,11 @@ const fetchStatistics = async () => {
       const avgWords = sortedPosts.length > 0 ? 
         Math.round(wordCount / sortedPosts.length) : 0;
   
-      // Set all related state
       setUserPosts(sortedPosts);
       setPostsCount(sortedPosts.length);
       setTotalLikes(likesCount);
       setAvgWordCount(avgWords);
   
-      // Return posts for fetchStatistics to use
       return sortedPosts;
     } catch (err) {
       console.error('Error fetching posts data:', err);
@@ -202,7 +207,6 @@ const fetchStatistics = async () => {
     }
   };
 
-  // In Profile.js
   useEffect(() => {
     const fetchAllData = async () => {
       setIsLoading(true);
@@ -212,8 +216,6 @@ const fetchStatistics = async () => {
           fetchPostsData(),
           fetchStatistics()
         ]);
-        // Don't need to set additional state here since each fetch function 
-        // already handles its own state updates
       } catch (error) {
         console.error('Error fetching data:', error);
         setError('Failed to load some data');
@@ -256,9 +258,11 @@ const fetchStatistics = async () => {
       );
       setProfileData(response.data);
       setIsEditing(false);
+      setNotification({ message: 'Profile updated successfully', type: 'success' });
     } catch (err) {
       console.error('Error saving profile:', err);
       setError('Failed to save profile');
+      setNotification({ message: 'Failed to update profile', type: 'error' });
     }
   };
 
@@ -313,15 +317,16 @@ const fetchStatistics = async () => {
                         type="text"
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
-                        className="w-full p-4 border rounded-2xl bg-[#D9D9D9] text-xl mb-4"
+                        className="bg-gray-50 w-full p-4 border rounded-2xl bg-[#D9D9D9] text-xl mb-4"
                         placeholder={profileData.username}
                       />
-                      <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full p-4 border rounded-2xl bg-[#D9D9D9] text-xl"
-                        placeholder={profileData.email}
+                      <div className='flex'>
+                        <p className="text-2xl font-semibold">{profileData.email}</p>
+                      </div>
+                      <Notification
+                        message={notification.message}
+                        type={notification.type}
+                        onClose={() => setNotification({ message: '', type: '' })}
                       />
                     </>
                   ) : (

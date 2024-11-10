@@ -1,25 +1,25 @@
-// backend/routes/users.js
 const express = require('express');
 const router = express.Router();
 const { 
   getProfile, 
   updateProfile, 
   getUserProfileById,
-  getMonthlyStats,  // Add this new controller
-  getWritingStats
+  getMonthlyStats,
+  getWritingStats,
+  checkEmailAvailability 
 } = require('../controllers/userController');
 const { protect } = require('../middlewares/authMiddleware');
 
-// Existing routes
+// Profile routes
 router.get('/profile', protect, getProfile);
 router.put('/profile', protect, updateProfile);
 router.get('/:userId/profile', protect, getUserProfileById);
 
-// New statistics route
-// @route   GET /api/users/monthly-stats
-// @desc    Get user's monthly writing statistics
-// @access  Private
+// Statistics routes
 router.get('/monthly-stats', protect, getMonthlyStats);
 router.get('/writing-stats', protect, getWritingStats);
+
+// Email availability route (public)
+router.get('/check-email', checkEmailAvailability);
 
 module.exports = router;

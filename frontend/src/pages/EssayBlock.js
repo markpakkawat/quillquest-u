@@ -134,7 +134,7 @@ const SidebarItem = ({
                   onDelete(id);
                 }
               }}
-              className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 
+              className="w-auto mt-0 opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 
                 hover:text-red-500 rounded-full hover:bg-red-50
                 transition-all duration-200"
             >
@@ -191,14 +191,14 @@ const AddBodyParagraphButton = ({ onClick }) => (
 
       <button
         onClick={onClick}
-        className="flex-grow bg-purple-600 rounded-lg py-3 px-4 
+        className="flex-grow bg-purple-600 rounded-lg 
           text-white font-medium
           transform transition-all duration-200
           hover:bg-purple-700
           active:scale-[0.99]
           focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
       >
-        <div className="flex items-center justify-center space-x-2">
+        <div className="flex items-center justify-center space-x-2 ">
           <span>Add Body Paragraph</span>
           <PlusIcon className="h-5 w-5" />
         </div>

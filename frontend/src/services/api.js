@@ -1,5 +1,5 @@
-// services/api.js
 import axios from 'axios';
+import { logout } from '../context/AuthContext.js';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001/api';
 
@@ -116,6 +116,7 @@ api.interceptors.response.use(
         ...errorDetails,
         timeout: originalRequest?.timeout
       });
+      console.error('Request timed out');
     } else if (!error.response) {
       logWithDetails('Network Error', errorDetails);
     } else {
@@ -124,7 +125,7 @@ api.interceptors.response.use(
         case 401:
           logWithDetails('Authentication Error', errorDetails);
           localStorage.removeItem('token');
-          // Optionally redirect to login
+          logout(); // Call the imported logout function
           break;
 
         case 403:
