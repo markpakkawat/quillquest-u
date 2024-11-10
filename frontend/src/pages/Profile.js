@@ -42,7 +42,6 @@ const Profile = () => {
     historical: null
   });
 
-
   const fetchStatistics = async () => {
     try {
       const essaySections = JSON.parse(localStorage.getItem('essaySections') || '[]');
