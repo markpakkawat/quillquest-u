@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PlusIcon, XIcon, DocumentTextIcon } from '@heroicons/react/solid';
+import { PlusIcon, XIcon, HomeIcon,DocumentTextIcon } from '@heroicons/react/solid';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const ProgressCircle = ({ percentage }) => (
@@ -18,7 +18,7 @@ const ProgressCircle = ({ percentage }) => (
         transform="rotate(-90 18 18)"
       ></circle>
     </svg>
-    <div className="absolute inset-0 flex items-center justify-center text-xs font-medium text-purple-600">
+    <div className="text-white absolute inset-0 flex items-center justify-center text-xs font-small text-purple-600">
       {percentage}%
     </div>
   </div>
@@ -30,6 +30,15 @@ const EssaySection = ({ title, percentage, isLast, onClick, onDelete, showDelete
   return (
     <div className="relative">
       <div className="flex items-center mb-4">
+        {showDelete && (
+          <button
+            onClick={onDelete}
+            className="w-auto mx-4 bg-red-500 text-white rounded-full p-2 hover:bg-red-300"
+            aria-label="Delete paragraph"
+          >
+            <XIcon className="h-5 w-5" />
+          </button>
+        )}
         <button
           onClick={onClick}
           className="flex-grow flex items-center justify-between bg-purple-600 text-white 
@@ -38,15 +47,7 @@ const EssaySection = ({ title, percentage, isLast, onClick, onDelete, showDelete
           <span>{title}</span>
           <ProgressCircle percentage={percentage} />
         </button>
-        {showDelete && (
-          <button
-            onClick={onDelete}
-            className="ml-2 bg-red-500 text-white rounded-full p-2 hover:bg-red-600"
-            aria-label="Delete paragraph"
-          >
-            <XIcon className="h-5 w-5" />
-          </button>
-        )}
+        
       </div>
       {/* Only show the vertical line if it's not the conclusion */}
       {!isConclusion && (
@@ -260,7 +261,17 @@ export default function EssayBuilder() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-purple-600 p-4">
+    <div className="space-y-2 min-h-screen flex flex-col items-center justify-center bg-purple-600 p-4">
+      <div>
+      <button
+            onClick={handleCancel}
+            className="bg-red-400 text-white w-[24rem] py-1 rounded-full hover:bg-red-600 
+              transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 
+              focus:ring-opacity-50 mt-0"
+          >
+            Back
+          </button>
+      </div>
       <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
         <h1 className="text-2xl font-bold text-purple-600 mb-6">Essay Builder</h1>
         
@@ -315,24 +326,17 @@ export default function EssayBuilder() {
         </div>
 
         {/* Footer buttons */}
-        <div className="flex justify-between mt-6">
-          <button
-            onClick={handleCancel}
-            className="bg-red-500 text-white px-4 py-2 rounded-full hover:bg-red-600 
-              transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 
-              focus:ring-opacity-50"
-          >
-            Cancel
-          </button>
+        <div className="flex justify-center mt-6">
           <button 
             onClick={handleNextClick}
-            className="bg-purple-600 text-white px-4 py-2 rounded-full hover:bg-purple-700 
+            className="bg-purple-600 text-white w-auto px-8 py-2 rounded-full hover:bg-purple-700 
               transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 
               focus:ring-opacity-50"
           >
-            Next
+            Review
           </button>
         </div>
+        
       </div>
     </div>
   );

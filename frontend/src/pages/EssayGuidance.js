@@ -82,6 +82,7 @@ export default function EssayGuidance() {
   return (
     <div className="flex-col space-y-5 min-h-screen flex items-center justify-center bg-purple-600 p-4">
       {/* Add this button */}
+      <div>
         <button
         onClick={() => navigate('/home')}
         className="bg-white text-purple-600 px-4 py-2 rounded-full 
@@ -90,6 +91,7 @@ export default function EssayGuidance() {
         <HomeIcon className="h-5 w-5" />
         <span>Back to Home</span>
       </button>
+      </div>
       
       
       {/* Rest of your existing content */}
@@ -103,17 +105,17 @@ export default function EssayGuidance() {
             id="title"
             value={title}
             onChange={handleTitleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           />
         </div>
 
         <div className="space-y-2">
-          <span className="block text-sm font-medium text-gray-700">Post Type</span>
+          <span className="mb-4 block text-sm font-medium text-gray-700">Post Type</span>
           <div className="flex rounded-md shadow-sm">
             <button
               type="button"
               onClick={() => handlePostTypeSelection('discussion')}
-              className={`w-1/2 py-2 px-4 text-sm font-medium rounded-l-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:z-10 ${
+              className={`w-1/2 py-2 px-4 mt-0 text-sm font-medium rounded-l-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:z-10 ${
                 postType === 'discussion'
                   ? 'bg-purple-100 text-purple-600'
                   : 'bg-white text-gray-700 hover:bg-gray-50'
@@ -124,7 +126,7 @@ export default function EssayGuidance() {
             <button
               type="button"
               onClick={() => handlePostTypeSelection('advice')}
-              className={`w-1/2 py-2 px-4 text-sm font-medium rounded-r-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:z-10 ${
+              className={`w-1/2 py-2 px-4 mt-0 text-sm font-medium rounded-r-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:z-10 ${
                 postType === 'advice'
                   ? 'bg-purple-100 text-purple-600'
                   : 'bg-white text-gray-700 hover:bg-gray-50'
@@ -155,9 +157,9 @@ export default function EssayGuidance() {
                   id="prompt"
                   value={selectedPrompt}
                   onChange={handlePromptSelection}
-                  className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm rounded-md appearance-none"
+                  className="hover:bg-gray-100 cursor-pointer block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm rounded-md appearance-none"
                 >
-                  <option value="">Select Prompt</option>
+                  <option value="">Select a Prompt . . .</option>
                   {prompts.map((prompt) => (
                     <option key={prompt._id} value={prompt._id}>
                       {prompt.topic}
