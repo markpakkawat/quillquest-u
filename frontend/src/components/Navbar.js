@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import HomeIcon from '@mui/icons-material/Home';
@@ -11,6 +11,7 @@ import api from '../services/api';
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowOutwardIcon from '@mui/icons-material/ArrowOutward';
 
+
 const Navbar = () => {
   const { auth, logout } = useContext(AuthContext);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -21,6 +22,9 @@ const Navbar = () => {
   const notificationRef = useRef(null);
   const [error, setError] = useState('');
   const [isCreateHovered, setIsCreateHovered] = useState(false);
+  const location = useLocation();
+  const isHomePage = location.pathname === '/home';
+  
 
   // Toggle dropdown visibility
   const toggleDropdown = () => {
@@ -148,7 +152,7 @@ const Navbar = () => {
           <Link 
             to="/home" 
             className={`pl-3 pr-2 py-2 rounded-l-xl flex items-center ${
-              isCreateHovered ? 'bg-[#D9D9D9] text-black' : 'bg-[#333] text-white'
+              !isHomePage ? 'bg-[#D9D9D9] text-black' : 'bg-[#333] text-white'
             } transition-colors duration-200`}
           > 
             Home <HomeIcon className="ml-1" />
