@@ -80,11 +80,11 @@ const Post = ({ post }) => {
         <div className="flex">
           <div className={`${avatarColor} text-[white] font-[bold] w-10 h-10 flex items-center justify-center mr-5 rounded-[50%]`}>
             <span className='font-sans font-bold'>
-              {post.userId.username.charAt(0).toUpperCase()}
+              {post.userId?.username.charAt(0).toUpperCase()}
             </span>
           </div>
           <div className="flex flex-col items-baseline">
-            <span className="font-semibold text-black">{post.userId.username}</span>
+            <span className="font-semibold text-black">{post.userId?.username || "unknown"}</span>
             <span className="text-[gray] text-[0.85rem]"> • {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}</span>
           </div>
         </div>
