@@ -25,21 +25,21 @@ then lead to -> `Security` -> `Network Access` | and add your IP into a list
 Add .env file with these variables base
 #### Frontend `.env`
 ```
-- REACT_APP_API_BASE_URL= http://localhost:5000/api
-- REACT_APP_SOCKET_URL= http://localhost:5000
-- REACT_APP_GROQ_API_KEY= your_GROQ_api_key
+REACT_APP_API_BASE_URL= http://localhost:5000/api
+REACT_APP_SOCKET_URL= http://localhost:5000
+REACT_APP_GROQ_API_KEY= your_GROQ_api_key
 ```
 #### Backend `.env`
 ```
-- PORT= 5000
-- MONGO_URI= your_mongodb_connection_string
-- JWT_SECRET= your_jwt_secret #or set to anythings
-- REACT_APP_GROQ_API_KEY= your_GROQ_api_key
-- FRONTEND_URL= http://localhost:3000
-- EMAIL_USER= your_email
-- EMAIL_PASS= your_password #(suggest using App password)
-- EMAIL_HOST= smtp.gmail.com #or your prefered email host
-- EMAIL_PORT= 587 #or depend on email host
+PORT= 5000
+MONGO_URI= your_mongodb_connection_string
+JWT_SECRET= your_jwt_secret #or set to anythings
+REACT_APP_GROQ_API_KEY= your_GROQ_api_key
+FRONTEND_URL= http://localhost:3000
+EMAIL_USER= your_email
+EMAIL_PASS= your_password #(suggest using App password)
+EMAIL_HOST= smtp.gmail.com #or your prefered email host
+EMAIL_PORT= 587 #or depend on email host
 ```
 ### Running the app
 - Frontend:
