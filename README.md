@@ -2,6 +2,7 @@
   A social media web application where users can create posts, comment, reply, and interact. It integrates AI to assist users with advisor chatbot and generating prompts (initial topic), enhancing creativity. Also with the writing statistics to see improving before complete the writing.
 ## Getting Started
 ### Prerequisites
+- **Git version control**: Intalled locally
 - **Node.js**: v16+ required
 - **MongoDB**: Installed locally or via cloud (MongoDB Atlas)
 - **GROQ cloud**: Sign in and Create an API key from https://console.groq.com/keys
