@@ -18,9 +18,13 @@ git clone https://github.com/markpakkawat/quillquest-u.git
 
 3. Give permission for current IP address on MongoDB Atlas:
 
-Sign in and get into MongoDB Atlas project at https://www.mongodb.com/
+- Sign in MongoDB website at https://www.mongodb.com/ . 
 
-then lead to -> `Security` -> `Network Access` | and add your IP into a list
+- Create a cluster on `DATABASE` section -> `Clusters`
+
+- Then, Add new database user to get the contection string on `Security` section -> `Database Access`. Do note the password to be used in connection string.
+
+- After created a cluster and added database user, then lead to -> `Security` section -> `Network Access` | and add your IP into a list
 
 ### Setting up environment variable
 Add .env file with these variables base
