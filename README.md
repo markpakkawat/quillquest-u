@@ -105,3 +105,28 @@ npm run dev
         
         └── utils
 
+## Contact
+- Micko kok
+
+Address: 1315,3, Sira Mansion 9/3, Soi Pracha Uthit 26, Pracha Uthit Road
+
+Email: 64130500203@ad.sit.kmutt.ac.th
+
+Phone: 0823536704
+
+- Pakkawat Wassa
+Address: 45/1, Baan Akenake, Pracha Uthit Road
+
+Email: 64130500239@ad.sit.kmutt.ac.th
+
+Phone: 0928613737
+
+- Winanya Buakaew
+
+Address: 3/2 AnamaiNgamJaroen 25 Section 2-2, Thakham
+
+Email: 64130500268@ad.sit.kmutt.ac.th
+
+Phone: 0910052321
+
+
