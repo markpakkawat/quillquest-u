@@ -20,7 +20,7 @@ git clone https://github.com/markpakkawat/quillquest-u.git
 
 - Sign in MongoDB website at https://www.mongodb.com/ . 
 
-- Create a cluster on `DATABASE` section -> `Clusters`
+- Add a new project and Create a cluster on `DATABASE` section -> `Clusters` . Select free plan.
 
 - Then, Add new database user to get the contection string on `Security` section -> `Database Access`. Do note the password to be used in connection string.
 
