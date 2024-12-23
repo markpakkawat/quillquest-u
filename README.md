@@ -115,6 +115,7 @@ Email: 64130500203@ad.sit.kmutt.ac.th
 Phone: 0823536704
 
 - Pakkawat Wassa
+
 Address: 45/1, Baan Akenake, Pracha Uthit Road
 
 Email: 64130500239@ad.sit.kmutt.ac.th
